@@ -981,7 +981,10 @@ contains
 
     call mesh_partition_reorder(par_env, shared_env, mesh)
 
-    call build_square_geometry(par_env, cps, side_length, mesh)
+    ! XXX: find a good place to put this function call
+    call set_offsets(shared_env, mesh)
+
+    call build_square_geometry(par_env, shared_env, cps, side_length, mesh)
 
     call cleanup_topo(shared_env, mesh)
 
@@ -1372,9 +1375,10 @@ contains
 
   end subroutine build_square_topology_connectivity
 
-  subroutine build_square_geometry(par_env, cps, side_length, mesh)
+  subroutine build_square_geometry(par_env, shared_env, cps, side_length, mesh)
 
     class(parallel_environment), intent(in) :: par_env !< The parallel environment to construct the mesh.
+    class(parallel_environment), intent(in) :: shared_env !< The shared memory environment
     integer(ccs_int), intent(in) :: cps                !< Number of cells per side of the mesh.
     real(ccs_real), intent(in) :: side_length          !< The length of each side.
 
@@ -1387,6 +1391,9 @@ contains
     integer(ccs_int) :: local_num_cells
     integer(ccs_int) :: total_num_cells
     integer(ccs_int) :: max_faces
+    integer(ccs_int) :: sum_local_num_cells
+    integer(ccs_int) :: sum_total_num_cells
+    integer(ccs_int) :: all_max_faces
     integer(ccs_int) :: vert_per_cell
 
     logical :: is_boundary
@@ -1407,6 +1414,8 @@ contains
     real(ccs_real), dimension(2) :: x_v ! Vertex centre array
     type(vert_locator) :: loc_v         ! Vertex locator object
 
+    integer :: ierr
+
     call set_mesh_object(mesh)
     select type (par_env)
     type is (parallel_environment_mpi)
@@ -1416,19 +1425,32 @@ contains
 
       call get_total_num_cells(total_num_cells)
       call get_max_faces(max_faces)
-      allocate (mesh%geo%x_p(ndim, total_num_cells))
-      allocate (mesh%geo%x_f(ndim, max_faces, local_num_cells)) !< @note Currently hardcoded as a 2D mesh. @endnote
-      allocate (mesh%geo%volumes(total_num_cells))
-      allocate (mesh%geo%face_areas(max_faces, local_num_cells))
-      allocate (mesh%geo%face_normals(ndim, max_faces, local_num_cells)) ! Currently hardcoded as a 2D mesh.
+
+      ! Sum up the array sizes XXX: Should this be standalone or integrated into parameter in mesh%topo?
+      select type (shared_env)
+      type is (parallel_environment_mpi)
+        call mpi_allreduce(local_num_cells, sum_local_num_cells, 1, MPI_INTEGER, MPI_SUM, shared_env%comm, ierr)
+        call mpi_allreduce(total_num_cells, sum_total_num_cells, 1, MPI_INTEGER, MPI_SUM, shared_env%comm, ierr)
+        call mpi_allreduce(max_faces, all_max_faces, 1, MPI_INTEGER, MPI_MAX, shared_env%comm, ierr)
+      class default
+        call error_abort("invalid parallel environment")
+      end select
+      call create_shared_array(shared_env, [ndim, sum_total_num_cells], mesh%geo%x_p, mesh%geo%x_p_window)
+      call create_shared_array(shared_env, [ndim, all_max_faces, sum_local_num_cells], mesh%geo%x_f, mesh%geo%x_f_window) !< @note Currently hardcoded as a 2D mesh. @endnote
+      call create_shared_array(shared_env, [ndim, all_max_faces, sum_local_num_cells], mesh%geo%face_normals, mesh%geo%face_normals_window) ! Currently hardcoded as a 2D mesh.
+      call create_shared_array(shared_env, sum_total_num_cells, mesh%geo%volumes, mesh%geo%volumes_window)
+      call create_shared_array(shared_env, [all_max_faces, sum_local_num_cells], mesh%geo%face_areas, mesh%geo%face_areas_window)
+
       allocate (mesh%geo%vert_coords(ndim, vert_per_cell, local_num_cells))
 
       mesh%geo%h = side_length / real(cps, ccs_real)
-      mesh%geo%volumes(:) = mesh%geo%h**2 !< @note Mesh is square and 2D @endnote
-      mesh%geo%face_normals(:, :, :) = 0.0_ccs_real
-      mesh%geo%x_p(:, :) = 0.0_ccs_real
-      mesh%geo%x_f(:, :, :) = 0.0_ccs_real
-      mesh%geo%face_areas(:, :) = mesh%geo%h  ! Mesh is square and 2D
+      if (is_root(shared_env)) then
+        mesh%geo%volumes(:) = mesh%geo%h**2 !< @note Mesh is square and 2D @endnote
+        mesh%geo%face_normals(:, :, :) = 0.0_ccs_real
+        mesh%geo%x_p(:, :) = 0.0_ccs_real
+        mesh%geo%x_f(:, :, :) = 0.0_ccs_real
+        mesh%geo%face_areas(:, :) = mesh%geo%h  ! Mesh is square and 2D
+      end if
       mesh%geo%vert_coords(:, :, :) = 0.0_ccs_real
 
       ! Set cell centre
@@ -1442,6 +1464,7 @@ contains
 
           call set_centre(loc_p, x_p)
         end do
+        call mpi_win_fence(0, mesh%geo%x_p_window, ierr)
 
         do i = 1_ccs_int, local_num_cells
           call create_cell_locator(i, loc_p)
@@ -1498,6 +1521,8 @@ contains
             end if
           end do
         end do
+        call mpi_win_fence(0, mesh%geo%x_f_window, ierr)
+        call mpi_win_fence(0, mesh%geo%face_normals_window, ierr)
 
         do i = 1_ccs_int, local_num_cells
           call create_cell_locator(i, loc_p)
@@ -2901,7 +2926,7 @@ contains
     print *, par_env%proc_id, "scalefactor        : ", mesh%geo%scalefactor
     print *, ""
 
-    if (allocated(mesh%geo%volumes)) then
+    if (associated(mesh%geo%volumes)) then
       print *, par_env%proc_id, "volumes     : ", mesh%geo%volumes(1:nb_elem)
     else
       print *, par_env%proc_id, "volumes     : UNALLOCATED"
@@ -2914,7 +2939,7 @@ contains
     end if
 
     print *, ""
-    if (allocated(mesh%geo%face_areas)) then
+    if (associated(mesh%geo%face_areas)) then
       do i = 1, nb_elem
         print *, par_env%proc_id, "face_areas(1:" // str(nb_elem / 2) // ", " // str(i) // ")", &
           mesh%geo%face_areas(1:nb_elem / 2, i)
@@ -2924,7 +2949,7 @@ contains
     end if
 
     print *, ""
-    if (allocated(mesh%geo%x_p)) then
+    if (associated(mesh%geo%x_p)) then
       do i = 1, nb_elem
         print *, par_env%proc_id, "x_p(:)", mesh%geo%x_p(:, i)
       end do
@@ -2933,7 +2958,7 @@ contains
     end if
 
     print *, ""
-    if (allocated(mesh%geo%x_f)) then
+    if (associated(mesh%geo%x_f)) then
       do i = 1, nb_elem
         print *, par_env%proc_id, "x_f(2, 1:" // str(nb_elem / 2) // ", " // str(i) // ")", &
           mesh%geo%x_f(2, 1:nb_elem / 2, i)
@@ -2943,7 +2968,7 @@ contains
     end if
 
     print *, ""
-    if (allocated(mesh%geo%face_normals)) then
+    if (associated(mesh%geo%face_normals)) then
       do i = 1, nb_elem
         print *, par_env%proc_id, "face_normals(2, 1:" // str(nb_elem / 2) // ", " // str(i) // ")", &
           mesh%geo%face_normals(2, 1:nb_elem / 2, i)
@@ -3213,5 +3238,63 @@ contains
       j = j + k
     end do
   end subroutine set_naive_distribution
+
+  subroutine set_offsets(shared_env, mesh)
+    class(parallel_environment), intent(in) :: shared_env
+    type(ccs_mesh), intent(inout) :: mesh
+
+    integer(ccs_int), dimension(:), pointer :: shared_array_local_offsets   !< Offset within shared arrays for quantities that are locally indexed (i.e. each rank is responsible for local_num_cells of these)
+    integer(ccs_int), dimension(:), pointer :: shared_array_total_offsets   !< Offset within shared arrays for quantities that are totally indexed (i.e. each rank is responsible for total_num_cells of these)
+    integer :: shared_array_local_offsets_window                             !< Assoicated shared window
+    integer :: shared_array_total_offsets_window                             !< Assoicated shared window
+    integer(ccs_int), dimension(:), allocatable :: temp_offset
+    integer(ccs_int) :: local_num_cells
+    integer(ccs_int) :: total_num_cells
+    integer(ccs_int) :: rank
+    integer(ccs_int) :: i
+    integer :: ierr
+
+    select type (shared_env)
+    type is (parallel_environment_mpi)
+      call create_shared_array(shared_env, shared_env%num_procs, shared_array_local_offsets, shared_array_local_offsets_window)
+      call create_shared_array(shared_env, shared_env%num_procs, shared_array_total_offsets, shared_array_total_offsets_window)
+
+      rank = shared_env%proc_id
+      call get_local_num_cells(local_num_cells)
+      call get_total_num_cells(total_num_cells)
+
+      shared_array_local_offsets(rank+1) = local_num_cells
+      shared_array_total_offsets(rank+1) = total_num_cells
+
+      call sync(shared_env)
+      if (rank == 0) then
+        print *, 'before shared array local offset', shared_array_local_offsets
+        print *, 'before shared array total offset', shared_array_total_offsets
+        allocate (temp_offset(shared_env%num_procs))
+        temp_offset(1) = 0
+        do i = 2, shared_env%num_procs 
+          temp_offset(i) = temp_offset(i-1) + shared_array_local_offsets(i-1)
+        end do
+        shared_array_local_offsets = temp_offset
+        
+        do i = 2, shared_env%num_procs 
+          temp_offset(i) = temp_offset(i-1) + shared_array_total_offsets(i-1)
+        end do
+        shared_array_total_offsets = temp_offset
+        print *, 'after shared array local offset', shared_array_local_offsets
+        print *, 'after shared array total offset', shared_array_total_offsets
+      end if
+      call mpi_win_fence(0, shared_array_local_offsets_window, ierr)
+      call mpi_win_fence(0, shared_array_total_offsets_window, ierr)
+
+      mesh%topo%shared_array_local_offset = shared_array_local_offsets(rank+1)
+      mesh%topo%shared_array_total_offset = shared_array_total_offsets(rank+1)
+      
+      call destroy_shared_array(shared_env, shared_array_local_offsets, shared_array_local_offsets_window)
+      call destroy_shared_array(shared_env, shared_array_total_offsets, shared_array_total_offsets_window)
+    class default
+      call error_abort("invalid parallel environment")
+    end select
+  end subroutine set_offsets
 
 end module mesh_utils
