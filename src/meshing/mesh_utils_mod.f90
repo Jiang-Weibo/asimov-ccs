@@ -1452,6 +1452,7 @@ contains
         mesh%geo%face_areas(:, :) = mesh%geo%h  ! Mesh is square and 2D
       end if
       mesh%geo%vert_coords(:, :, :) = 0.0_ccs_real
+      call mpi_win_fence(0, mesh%geo%x_p_window, ierr)
 
       ! Set cell centre
       associate (h => mesh%geo%h)
