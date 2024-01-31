@@ -164,7 +164,8 @@ module types
     integer :: x_f_window                                               !< Associated shared window
     real(ccs_real), dimension(:, :, :), pointer :: face_normals         !< Face normals (dimension, face, cell)
     integer :: face_normals_window                                      !< Associated shared window
-    real(ccs_real), dimension(:, :, :), allocatable :: vert_coords      !< Vertex coordinates (dimension, vertex, cell)
+    real(ccs_real), dimension(:, :, :), pointer :: vert_coords          !< Vertex coordinates (dimension, vertex, cell)
+    integer :: vert_coords_window                                       !< Associated shared window
     real(ccs_real), dimension(:), allocatable :: face_interpol          !< Face interpolation factor, factor = face_interpol(iface)
   end type geometry
 

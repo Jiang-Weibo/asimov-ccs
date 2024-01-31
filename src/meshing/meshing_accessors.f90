@@ -503,9 +503,10 @@ contains
     integer :: dim
 
     associate (cell => loc_v%index_p, &
-               vert => loc_v%cell_vert_ctr)
+               vert => loc_v%cell_vert_ctr, &
+               offset => mesh%topo%shared_array_local_offset)
       do dim = 1, min(size(x), ndim)
-        x(dim) = mesh%geo%vert_coords(dim, vert, cell)
+        x(dim) = mesh%geo%vert_coords(dim, vert, cell+offset)
       end do
     end associate
   end subroutine get_vert_centre
@@ -804,7 +805,6 @@ contains
     integer :: dim
 
     associate (i => loc_p%index_p, offset => mesh%topo%shared_array_total_offset)
-      !call dprint("setting cell centre at " // str(i+offset) // " i " // str(i) // " offset " // str(offset) // " x_p " // str(x_p(1)) // " " // str(x_p(2)))
       do dim = 1, min(size(x_p), ndim)
         mesh%geo%x_p(dim, i+offset) = x_p(dim)
       end do
@@ -835,9 +835,10 @@ contains
     integer :: dim
 
     associate (i => loc_v%index_p, &
-               j => loc_v%cell_vert_ctr)
+               j => loc_v%cell_vert_ctr, &
+               offset => mesh%topo%shared_array_local_offset)
       do dim = 1, min(size(x_v), ndim)
-        mesh%geo%vert_coords(dim, j, i) = x_v(dim)
+        mesh%geo%vert_coords(dim, j, i+offset) = x_v(dim)
       end do
     end associate
   end subroutine set_vert_centre

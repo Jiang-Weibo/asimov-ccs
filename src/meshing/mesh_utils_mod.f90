@@ -1440,8 +1440,7 @@ contains
       call create_shared_array(shared_env, [ndim, all_max_faces, sum_local_num_cells], mesh%geo%face_normals, mesh%geo%face_normals_window) ! Currently hardcoded as a 2D mesh.
       call create_shared_array(shared_env, sum_total_num_cells, mesh%geo%volumes, mesh%geo%volumes_window)
       call create_shared_array(shared_env, [all_max_faces, sum_local_num_cells], mesh%geo%face_areas, mesh%geo%face_areas_window)
-
-      allocate (mesh%geo%vert_coords(ndim, vert_per_cell, local_num_cells))
+      call create_shared_array(shared_env, [ndim, vert_per_cell, sum_local_num_cells], mesh%geo%vert_coords, mesh%geo%vert_coords_window)
 
       mesh%geo%h = side_length / real(cps, ccs_real)
       if (is_root(shared_env)) then
@@ -1450,8 +1449,8 @@ contains
         mesh%geo%x_p(:, :) = 0.0_ccs_real
         mesh%geo%x_f(:, :, :) = 0.0_ccs_real
         mesh%geo%face_areas(:, :) = mesh%geo%h  ! Mesh is square and 2D
+        mesh%geo%vert_coords(:, :, :) = 0.0_ccs_real
       end if
-      mesh%geo%vert_coords(:, :, :) = 0.0_ccs_real
       call mpi_win_fence(0, mesh%geo%x_p_window, ierr)
 
       ! Set cell centre
@@ -1553,6 +1552,7 @@ contains
           x_v(2) = x_p(2) + 0.5_ccs_real * h
           call set_centre(loc_v, x_v)
         end do
+        call mpi_win_fence(0, mesh%geo%vert_coords_window, ierr)
       end associate
 
       call compute_face_interpolation(mesh)
@@ -2979,7 +2979,7 @@ contains
     end if
 
     print *, ""
-    if (allocated(mesh%geo%vert_coords)) then
+    if (associated(mesh%geo%vert_coords)) then
       do i = 1, nb_elem
         print *, par_env%proc_id, "vert_coords(2, 1:" // str(nb_elem / 2) // ", " // str(i) // ")", &
           mesh%geo%vert_coords(2, 1:nb_elem / 2, i)
