@@ -964,6 +964,7 @@ contains
     type(ccs_mesh) :: mesh                             !< The resulting mesh.
 
     character(:), allocatable :: error_message
+    integer(ccs_int) :: local_num_cells, total_num_cells
 
     if (cps * cps < par_env%num_procs) then
       error_message = "ERROR: Global number of cells < number of ranks. &
@@ -3249,8 +3250,6 @@ contains
     integer :: shared_array_local_offsets_window                             !< Assoicated shared window
     integer :: shared_array_total_offsets_window                             !< Assoicated shared window
     integer(ccs_int), dimension(:), allocatable :: temp_offset
-    integer(ccs_int) :: local_num_cells
-    integer(ccs_int) :: total_num_cells
     integer(ccs_int) :: rank
     integer(ccs_int) :: i
     integer :: ierr
@@ -3261,16 +3260,12 @@ contains
       call create_shared_array(shared_env, shared_env%num_procs, shared_array_total_offsets, shared_array_total_offsets_window)
 
       rank = shared_env%proc_id
-      call get_local_num_cells(local_num_cells)
-      call get_total_num_cells(total_num_cells)
 
-      shared_array_local_offsets(rank+1) = local_num_cells
-      shared_array_total_offsets(rank+1) = total_num_cells
+      shared_array_local_offsets(rank+1) = mesh%topo%local_num_cells
+      shared_array_total_offsets(rank+1) = mesh%topo%total_num_cells
 
       call sync(shared_env)
       if (rank == 0) then
-        print *, 'before shared array local offset', shared_array_local_offsets
-        print *, 'before shared array total offset', shared_array_total_offsets
         allocate (temp_offset(shared_env%num_procs))
         temp_offset(1) = 0
         do i = 2, shared_env%num_procs 
@@ -3282,8 +3277,6 @@ contains
           temp_offset(i) = temp_offset(i-1) + shared_array_total_offsets(i-1)
         end do
         shared_array_total_offsets = temp_offset
-        print *, 'after shared array local offset', shared_array_local_offsets
-        print *, 'after shared array total offset', shared_array_total_offsets
       end if
       call mpi_win_fence(0, shared_array_local_offsets_window, ierr)
       call mpi_win_fence(0, shared_array_total_offsets_window, ierr)
