@@ -1452,7 +1452,7 @@ contains
         mesh%geo%face_areas(:, :) = mesh%geo%h  ! Mesh is square and 2D
         mesh%geo%vert_coords(:, :, :) = 0.0_ccs_real
       end if
-      call mpi_win_fence(0, mesh%geo%x_p_window, ierr)
+      call sync(shared_env)
 
       ! Set cell centre
       associate (h => mesh%geo%h)
@@ -1465,7 +1465,8 @@ contains
 
           call set_centre(loc_p, x_p)
         end do
-        call mpi_win_fence(0, mesh%geo%x_p_window, ierr)
+        !call mpi_win_fence(0, mesh%geo%x_p_window, ierr)
+        call sync(shared_env)
 
         do i = 1_ccs_int, local_num_cells
           call create_cell_locator(i, loc_p)
@@ -1522,8 +1523,9 @@ contains
             end if
           end do
         end do
-        call mpi_win_fence(0, mesh%geo%x_f_window, ierr)
-        call mpi_win_fence(0, mesh%geo%face_normals_window, ierr)
+        !call mpi_win_fence(0, mesh%geo%x_f_window, ierr)
+        !call mpi_win_fence(0, mesh%geo%face_normals_window, ierr)
+        call sync(shared_env)
 
         do i = 1_ccs_int, local_num_cells
           call create_cell_locator(i, loc_p)
@@ -1553,7 +1555,8 @@ contains
           x_v(2) = x_p(2) + 0.5_ccs_real * h
           call set_centre(loc_v, x_v)
         end do
-        call mpi_win_fence(0, mesh%geo%vert_coords_window, ierr)
+        !call mpi_win_fence(0, mesh%geo%vert_coords_window, ierr)
+        call sync(shared_env)
       end associate
 
       call compute_face_interpolation(mesh)
@@ -1620,8 +1623,11 @@ contains
 
     call mesh_partition_reorder(par_env, shared_env, mesh)
 
+    ! XXX: find a good place to put this function call
+    call set_offsets(shared_env, mesh)
+
     call timer_start(timer_build_geo)
-    call build_geometry(par_env, nx, ny, nz, side_length, mesh)
+    call build_geometry(par_env, shared_env, nx, ny, nz, side_length, mesh)
     call timer_stop(timer_build_geo)
 
     call cleanup_topo(shared_env, mesh)
@@ -2162,13 +2168,14 @@ contains
   !v Utility constructor to build a 3D mesh with hex cells.
   !
   !  Builds a Cartesian grid of nx*ny*nz cells.
-  subroutine build_geometry(par_env, nx, ny, nz, side_length, mesh)
+  subroutine build_geometry(par_env, shared_env, nx, ny, nz, side_length, mesh)
 
-    class(parallel_environment), intent(in) :: par_env !< The parallel environment to construct the mesh.
-    integer(ccs_int), intent(in) :: nx                 !< Number of cells in the x direction.
-    integer(ccs_int), intent(in) :: ny                 !< Number of cells in the y direction.
-    integer(ccs_int), intent(in) :: nz                 !< Number of cells in the z direction.
-    real(ccs_real), intent(in) :: side_length          !< The length of the side.
+    class(parallel_environment), intent(in) :: par_env    !< The parallel environment to construct the mesh.
+    class(parallel_environment), intent(in) :: shared_env !< The shared parallel environment.
+    integer(ccs_int), intent(in) :: nx                    !< Number of cells in the x direction.
+    integer(ccs_int), intent(in) :: ny                    !< Number of cells in the y direction.
+    integer(ccs_int), intent(in) :: nz                    !< Number of cells in the z direction.
+    real(ccs_real), intent(in) :: side_length             !< The length of the side.
 
     type(ccs_mesh), intent(inout) :: mesh                             !< The resulting mesh.
 
@@ -2183,6 +2190,9 @@ contains
     integer(ccs_int) :: local_num_cells ! The local cell count
     integer(ccs_int) :: total_num_cells ! The total cell count
     integer(ccs_int) :: max_faces       ! The maximum number of faces per cell
+    integer(ccs_int) :: sum_local_num_cells
+    integer(ccs_int) :: sum_total_num_cells
+    integer(ccs_int) :: all_max_faces
     integer(ccs_int) :: vert_per_cell
 
     real(ccs_real), dimension(3) :: x_p ! Cell centre array
@@ -2197,6 +2207,8 @@ contains
 
     real(ccs_real), dimension(3) :: x_v ! Vertex centre array
     type(vert_locator) :: loc_v         ! Vertex locator object
+    
+    integer :: ierr
 
     associate (foo => nz) ! Silence unused dummy argument
     end associate
@@ -2210,20 +2222,40 @@ contains
 
       call get_total_num_cells(total_num_cells)
       call get_max_faces(max_faces)
-      allocate (mesh%geo%x_p(ndim, total_num_cells))
-      allocate (mesh%geo%x_f(ndim, max_faces, local_num_cells))
-      allocate (mesh%geo%volumes(total_num_cells))
-      allocate (mesh%geo%face_areas(max_faces, local_num_cells))
-      allocate (mesh%geo%face_normals(ndim, max_faces, local_num_cells))
-      allocate (mesh%geo%vert_coords(ndim, vert_per_cell, local_num_cells))
+
+      ! Sum up the array sizes XXX: Should this be standalone or integrated into parameter in mesh%topo?
+      select type (shared_env)
+      type is (parallel_environment_mpi)
+        call mpi_allreduce(local_num_cells, sum_local_num_cells, 1, MPI_INTEGER, MPI_SUM, shared_env%comm, ierr)
+        call mpi_allreduce(total_num_cells, sum_total_num_cells, 1, MPI_INTEGER, MPI_SUM, shared_env%comm, ierr)
+        call mpi_allreduce(max_faces, all_max_faces, 1, MPI_INTEGER, MPI_MAX, shared_env%comm, ierr)
+      class default
+        call error_abort("invalid parallel environment")
+      end select
+      call create_shared_array(shared_env, [ndim, sum_total_num_cells], mesh%geo%x_p, mesh%geo%x_p_window)
+      call create_shared_array(shared_env, [ndim, all_max_faces, sum_local_num_cells], mesh%geo%x_f, mesh%geo%x_f_window) !< @note Currently hardcoded as a 2D mesh. @endnote
+      call create_shared_array(shared_env, [ndim, all_max_faces, sum_local_num_cells], mesh%geo%face_normals, mesh%geo%face_normals_window) ! Currently hardcoded as a 2D mesh.
+      call create_shared_array(shared_env, sum_total_num_cells, mesh%geo%volumes, mesh%geo%volumes_window)
+      call create_shared_array(shared_env, [all_max_faces, sum_local_num_cells], mesh%geo%face_areas, mesh%geo%face_areas_window)
+      call create_shared_array(shared_env, [ndim, vert_per_cell, sum_local_num_cells], mesh%geo%vert_coords, mesh%geo%vert_coords_window)
+
+      !allocate (mesh%geo%x_p(ndim, total_num_cells))
+      !allocate (mesh%geo%x_f(ndim, max_faces, local_num_cells))
+      !allocate (mesh%geo%volumes(total_num_cells))
+      !allocate (mesh%geo%face_areas(max_faces, local_num_cells))
+      !allocate (mesh%geo%face_normals(ndim, max_faces, local_num_cells))
+      !allocate (mesh%geo%vert_coords(ndim, vert_per_cell, local_num_cells))
 
       mesh%geo%h = side_length / real(nx, ccs_real) !< @note Assumes cube @endnote
-      mesh%geo%volumes(:) = mesh%geo%h**3 !< @note Mesh is cube @endnote
-      mesh%geo%face_normals(:, :, :) = 0.0_ccs_real
-      mesh%geo%x_p(:, :) = 0.0_ccs_real
-      mesh%geo%x_f(:, :, :) = 0.0_ccs_real
-      mesh%geo%face_areas(:, :) = mesh%geo%h**2
-      mesh%geo%vert_coords(:, :, :) = 0.0_ccs_real
+      if (is_root(shared_env)) then
+        mesh%geo%volumes(:) = mesh%geo%h**3 !< @note Mesh is cube @endnote
+        mesh%geo%face_normals(:, :, :) = 0.0_ccs_real
+        mesh%geo%x_p(:, :) = 0.0_ccs_real
+        mesh%geo%x_f(:, :, :) = 0.0_ccs_real
+        mesh%geo%face_areas(:, :) = mesh%geo%h**2
+        mesh%geo%vert_coords(:, :, :) = 0.0_ccs_real
+      end if
+      call sync(shared_env)
 
       ! Set cell centre
       associate (h => mesh%geo%h)
@@ -2237,6 +2269,7 @@ contains
 
           call set_centre(loc_p, x_p)
         end do
+        call sync(shared_env)
 
         do i = 1_ccs_int, local_num_cells
           call create_cell_locator(i, loc_p)
@@ -2305,6 +2338,7 @@ contains
 
           end do
         end do
+        call sync(shared_env)
 
         do i = 1_ccs_int, local_num_cells
           call create_cell_locator(i, loc_p)
@@ -2366,6 +2400,7 @@ contains
           x_v(3) = x_p(3) - 0.5_ccs_real * h
           call set_centre(loc_v, x_v)
         end do
+        call sync(shared_env)
       end associate
 
       call compute_face_interpolation(mesh)
