@@ -982,7 +982,6 @@ contains
 
     call mesh_partition_reorder(par_env, shared_env, mesh)
 
-    ! XXX: find a good place to put this function call
     call set_offsets(shared_env, mesh)
 
     call build_square_geometry(par_env, shared_env, cps, side_length, mesh)
@@ -1427,7 +1426,6 @@ contains
       call get_total_num_cells(total_num_cells)
       call get_max_faces(max_faces)
 
-      ! Sum up the array sizes XXX: Should this be standalone or integrated into parameter in mesh%topo?
       select type (shared_env)
       type is (parallel_environment_mpi)
         call mpi_allreduce(local_num_cells, sum_local_num_cells, 1, MPI_INTEGER, MPI_SUM, shared_env%comm, ierr)
@@ -1465,7 +1463,7 @@ contains
 
           call set_centre(loc_p, x_p)
         end do
-        !call mpi_win_fence(0, mesh%geo%x_p_window, ierr)
+        ! call mpi_win_fence(0, mesh%geo%x_p_window, ierr) ! XXX: decide on whether mpi_win_fence or sync is more appropriate (or other synchronisation)
         call sync(shared_env)
 
         do i = 1_ccs_int, local_num_cells
@@ -1523,8 +1521,8 @@ contains
             end if
           end do
         end do
-        !call mpi_win_fence(0, mesh%geo%x_f_window, ierr)
-        !call mpi_win_fence(0, mesh%geo%face_normals_window, ierr)
+        ! call mpi_win_fence(0, mesh%geo%x_f_window, ierr)            ! XXX: decide on whether mpi_win_fence or sync is more appropriate (or other synchronisation)
+        ! call mpi_win_fence(0, mesh%geo%face_normals_window, ierr)
         call sync(shared_env)
 
         do i = 1_ccs_int, local_num_cells
@@ -1623,7 +1621,6 @@ contains
 
     call mesh_partition_reorder(par_env, shared_env, mesh)
 
-    ! XXX: find a good place to put this function call
     call set_offsets(shared_env, mesh)
 
     call timer_start(timer_build_geo)
@@ -2223,7 +2220,6 @@ contains
       call get_total_num_cells(total_num_cells)
       call get_max_faces(max_faces)
 
-      ! Sum up the array sizes XXX: Should this be standalone or integrated into parameter in mesh%topo?
       select type (shared_env)
       type is (parallel_environment_mpi)
         call mpi_allreduce(local_num_cells, sum_local_num_cells, 1, MPI_INTEGER, MPI_SUM, shared_env%comm, ierr)
@@ -2238,13 +2234,6 @@ contains
       call create_shared_array(shared_env, sum_total_num_cells, mesh%geo%volumes, mesh%geo%volumes_window)
       call create_shared_array(shared_env, [all_max_faces, sum_local_num_cells], mesh%geo%face_areas, mesh%geo%face_areas_window)
       call create_shared_array(shared_env, [ndim, vert_per_cell, sum_local_num_cells], mesh%geo%vert_coords, mesh%geo%vert_coords_window)
-
-      !allocate (mesh%geo%x_p(ndim, total_num_cells))
-      !allocate (mesh%geo%x_f(ndim, max_faces, local_num_cells))
-      !allocate (mesh%geo%volumes(total_num_cells))
-      !allocate (mesh%geo%face_areas(max_faces, local_num_cells))
-      !allocate (mesh%geo%face_normals(ndim, max_faces, local_num_cells))
-      !allocate (mesh%geo%vert_coords(ndim, vert_per_cell, local_num_cells))
 
       mesh%geo%h = side_length / real(nx, ccs_real) !< @note Assumes cube @endnote
       if (is_root(shared_env)) then
@@ -2269,7 +2258,7 @@ contains
 
           call set_centre(loc_p, x_p)
         end do
-        call sync(shared_env)
+        call sync(shared_env) ! XXX: decide on whether mpi_win_fence or sync is more appropriate (or other synchronisation)
 
         do i = 1_ccs_int, local_num_cells
           call create_cell_locator(i, loc_p)
@@ -2400,7 +2389,7 @@ contains
           x_v(3) = x_p(3) - 0.5_ccs_real * h
           call set_centre(loc_v, x_v)
         end do
-        call sync(shared_env)
+        call sync(shared_env) ! XXX: decide on whether mpi_win_fence or sync is more appropriate (or other synchronisation)
       end associate
 
       call compute_face_interpolation(mesh)
@@ -3296,28 +3285,28 @@ contains
 
       rank = shared_env%proc_id
 
-      shared_array_local_offsets(rank+1) = mesh%topo%local_num_cells
-      shared_array_total_offsets(rank+1) = mesh%topo%total_num_cells
+      shared_array_local_offsets(rank + 1) = mesh%topo%local_num_cells
+      shared_array_total_offsets(rank + 1) = mesh%topo%total_num_cells
 
       call sync(shared_env)
       if (rank == 0) then
         allocate (temp_offset(shared_env%num_procs))
         temp_offset(1) = 0
         do i = 2, shared_env%num_procs 
-          temp_offset(i) = temp_offset(i-1) + shared_array_local_offsets(i-1)
+          temp_offset(i) = temp_offset(i - 1) + shared_array_local_offsets(i - 1)
         end do
         shared_array_local_offsets = temp_offset
         
         do i = 2, shared_env%num_procs 
-          temp_offset(i) = temp_offset(i-1) + shared_array_total_offsets(i-1)
+          temp_offset(i) = temp_offset(i - 1) + shared_array_total_offsets(i - 1)
         end do
         shared_array_total_offsets = temp_offset
       end if
       call mpi_win_fence(0, shared_array_local_offsets_window, ierr)
       call mpi_win_fence(0, shared_array_total_offsets_window, ierr)
 
-      mesh%topo%shared_array_local_offset = shared_array_local_offsets(rank+1)
-      mesh%topo%shared_array_total_offset = shared_array_total_offsets(rank+1)
+      mesh%topo%shared_array_local_offset = shared_array_local_offsets(rank + 1)
+      mesh%topo%shared_array_total_offset = shared_array_total_offsets(rank + 1)
       
       call destroy_shared_array(shared_env, shared_array_local_offsets, shared_array_local_offsets_window)
       call destroy_shared_array(shared_env, shared_array_total_offsets, shared_array_total_offsets_window)
