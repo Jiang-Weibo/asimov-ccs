@@ -1462,7 +1462,6 @@ contains
 
           call set_centre(loc_p, x_p)
         end do
-        ! call mpi_win_fence(0, mesh%geo%x_p_window, ierr) ! XXX: decide on whether mpi_win_fence or sync is more appropriate (or other synchronisation)
         call sync(shared_env)
 
         do i = 1_ccs_int, local_num_cells
@@ -1520,8 +1519,6 @@ contains
             end if
           end do
         end do
-        ! call mpi_win_fence(0, mesh%geo%x_f_window, ierr)            ! XXX: decide on whether mpi_win_fence or sync is more appropriate (or other synchronisation)
-        ! call mpi_win_fence(0, mesh%geo%face_normals_window, ierr)
         call sync(shared_env)
 
         do i = 1_ccs_int, local_num_cells
@@ -1552,7 +1549,6 @@ contains
           x_v(2) = x_p(2) + 0.5_ccs_real * h
           call set_centre(loc_v, x_v)
         end do
-        !call mpi_win_fence(0, mesh%geo%vert_coords_window, ierr)
         call sync(shared_env)
       end associate
 
@@ -2257,7 +2253,7 @@ contains
 
           call set_centre(loc_p, x_p)
         end do
-        call sync(shared_env) ! XXX: decide on whether mpi_win_fence or sync is more appropriate (or other synchronisation)
+        call sync(shared_env) 
 
         do i = 1_ccs_int, local_num_cells
           call create_cell_locator(i, loc_p)
@@ -2388,7 +2384,7 @@ contains
           x_v(3) = x_p(3) - 0.5_ccs_real * h
           call set_centre(loc_v, x_v)
         end do
-        call sync(shared_env) ! XXX: decide on whether mpi_win_fence or sync is more appropriate (or other synchronisation)
+        call sync(shared_env) 
       end associate
 
       call compute_face_interpolation(mesh)
@@ -3301,8 +3297,7 @@ contains
         end do
         shared_array_total_offsets = temp_offset
       end if
-      call mpi_win_fence(0, shared_array_local_offsets_window, ierr)
-      call mpi_win_fence(0, shared_array_total_offsets_window, ierr)
+      call sync(shared_env)
 
       mesh%topo%shared_array_local_offset = shared_array_local_offsets(rank + 1)
       mesh%topo%shared_array_total_offset = shared_array_total_offsets(rank + 1)
