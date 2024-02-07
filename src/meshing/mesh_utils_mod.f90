@@ -3271,7 +3271,6 @@ contains
     integer(ccs_int), dimension(:), allocatable :: temp_offset
     integer(ccs_int) :: rank
     integer(ccs_int) :: i
-    integer :: ierr
 
     select type (shared_env)
     type is (parallel_environment_mpi)
