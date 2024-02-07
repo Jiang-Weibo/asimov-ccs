@@ -1,7 +1,7 @@
 submodule(meshing) meshing_accessors
 #include "ccs_macros.inc"
 
-  use utils, only: exit_print, str, debug_print
+  use utils, only: exit_print, str
 
   implicit none
 
