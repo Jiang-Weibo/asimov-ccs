@@ -964,7 +964,6 @@ contains
     type(ccs_mesh) :: mesh                             !< The resulting mesh.
 
     character(:), allocatable :: error_message
-    integer(ccs_int) :: local_num_cells, total_num_cells
 
     if (cps * cps < par_env%num_procs) then
       error_message = "ERROR: Global number of cells < number of ranks. &
