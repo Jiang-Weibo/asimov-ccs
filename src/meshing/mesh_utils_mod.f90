@@ -185,14 +185,20 @@ contains
     integer :: i
     
     if (is_root(par_env)) then
+      print *, "=========================="
       print *, "Boundary ID map"
       do i = 1, size(mesh%bnd_names)
         print *, i, trim(mesh%bnd_names(i))
       end do
+      print *, "=========================="
     end if
 
-    if (-minval(mesh%topo%bnd_rid) > size(mesh%bnd_names)) then
+    if (-minval(mesh%topo%nb_indices) > size(mesh%bnd_names)) then
       call error_abort("Boundary IDs exceed supplied boundary name count!")
+    end if
+    call sync(par_env)
+    if (is_root(par_env)) then
+      print *, "Boundary name list / ID compatibility: PASS"
     end if
     
   end subroutine check_mesh_bnd_names
@@ -1436,7 +1442,7 @@ contains
 
     real(ccs_real), dimension(3) :: x_nb_3 ! Cell centre array of neighbour cell
     real(ccs_real), dimension(2) :: x_nb   ! Cell centre array of neighbour cell
-    type(neighbour_locator) :: loc_nb    ! the neighbour locator object.
+    type(neighbour_locator) :: loc_nb      ! the neighbour locator object.
 
     real(ccs_real), dimension(2) :: x_f    ! Face centre array
     real(ccs_real), dimension(2) :: normal ! Face normal array
