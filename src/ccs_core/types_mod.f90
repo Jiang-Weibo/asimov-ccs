@@ -165,7 +165,8 @@ module types
   type, public :: ccs_mesh
     type(topology) :: topo
     type(geometry) :: geo
-    logical :: is_generated    !< Indicates whether mesh was generated (true) or read (false)
+    logical :: is_generated                                    !< Indicates whether mesh was generated (true) or read (false)
+    character(len=128), dimension(:), allocatable :: bnd_names !< Array of boundary names, index corresponding to the boundary ID
   end type ccs_mesh
 
   !> BC data type

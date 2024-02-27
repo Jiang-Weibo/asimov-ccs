@@ -103,7 +103,7 @@ module mesh_utils
 contains
 
   !v Read mesh from file
-  subroutine read_mesh(par_env, shared_env, case_name, mesh)
+  subroutine read_mesh(par_env, shared_env, case_name, bnd_names, mesh)
 
     use partitioning, only: compute_connectivity_get_local_cells, &
                             compute_partitioner_input
@@ -113,7 +113,8 @@ contains
 
     class(parallel_environment), allocatable, target, intent(in) :: par_env !< The parallel environment
     class(parallel_environment), allocatable, target, intent(in) :: shared_env !< The parallel environment
-    character(len=:), allocatable :: case_name
+    character(len=*), intent(in) :: case_name
+    character(len=128), dimension(:), intent(in) :: bnd_names
     type(ccs_mesh), intent(inout) :: mesh                                   !< The mesh
 
     ! Local variables
@@ -170,6 +171,12 @@ contains
 
     call cleanup_topo(shared_env, mesh)
 
+    mesh%bnd_names = bnd_names
+
+    if (-minval(mesh%topo%bnd_rid) > size(mesh%bnd_names)) then
+      call error_abort("Boundary IDs exceed supplied boundary name count!")
+    end if
+    
   end subroutine read_mesh
 
   !v Read the topology data from an input (HDF5) file
@@ -952,7 +959,7 @@ contains
   !v Utility constructor to build a 2D mesh with hex cells.
   !
   !  Builds a Cartesian grid of nx*ny cells.
-  function build_square_mesh(par_env, shared_env, cps, side_length) result(mesh)
+  function build_square_mesh(par_env, shared_env, cps, side_length, opt_bnd_names) result(mesh)
 
     use partitioning, only: compute_partitioner_input
 
@@ -960,11 +967,14 @@ contains
     class(parallel_environment), allocatable, target, intent(in) :: shared_env !< The shared memory environment
     integer(ccs_int), intent(in) :: cps                !< Number of cells per side of the mesh.
     real(ccs_real), intent(in) :: side_length          !< The length of the side.
-
+    character(len=128), dimension(4), intent(in), optional :: opt_bnd_names !< Boundary name list
+    
     type(ccs_mesh) :: mesh                             !< The resulting mesh.
 
     character(:), allocatable :: error_message
 
+    integer :: i
+    
     if (cps * cps < par_env%num_procs) then
       error_message = "ERROR: Global number of cells < number of ranks. &
                       &Increase the mesh size or reduce the number of MPI ranks."
@@ -985,6 +995,23 @@ contains
 
     call cleanup_topo(shared_env, mesh)
 
+    ! Create boundary names list
+    if (present(opt_bnd_names)) then
+      mesh%bnd_names = opt_bnd_names
+    else
+      allocate(mesh%bnd_names(4))
+      mesh%bnd_names(left) = "left"
+      mesh%bnd_names(right) = "right"
+      mesh%bnd_names(bottom) = "bottom"
+      mesh%bnd_names(top) = "top"
+    end if
+    if (is_root(par_env)) then
+      print *, "Boundary ID map"
+      do i = 1, size(mesh%bnd_names)
+        print *, i, trim(mesh%bnd_names(i))
+      end do
+    end if
+  
   end function build_square_mesh
 
   !v Utility constructor to build a square mesh.
@@ -1543,7 +1570,7 @@ contains
   !v Utility constructor to build a 3D mesh with hex cells.
   !
   !  Builds a Cartesian grid of nx*ny*nz cells.
-  function build_mesh(par_env, shared_env, nx, ny, nz, side_length) result(mesh)
+  function build_mesh(par_env, shared_env, nx, ny, nz, side_length, opt_bnd_names) result(mesh)
 
     use partitioning, only: compute_partitioner_input
     use parallel, only: timer
@@ -1555,7 +1582,8 @@ contains
     integer(ccs_int), intent(in) :: ny                 !< Number of cells in the y direction.
     integer(ccs_int), intent(in) :: nz                 !< Number of cells in the z direction.
     real(ccs_real), intent(in) :: side_length          !< The length of the side.
-
+    character(len=128), dimension(6), intent(in), optional :: opt_bnd_names
+    
     type(ccs_mesh) :: mesh                             !< The resulting mesh.
 
     character(:), allocatable :: error_message
@@ -1564,6 +1592,8 @@ contains
     integer(ccs_int) :: timer_build_geo
     integer(ccs_int) :: timer_partitioner_input
 
+    integer :: i
+    
     call timer_register("Build mesh topology", timer_build_topo)
     call timer_register("Compute partitioner input", timer_partitioner_input)
     call timer_register("Build mesh geometry", timer_build_geo)
@@ -1598,6 +1628,25 @@ contains
     call timer_stop(timer_build_geo)
 
     call cleanup_topo(shared_env, mesh)
+
+    ! Create boundary names list
+    if (present(opt_bnd_names)) then
+      mesh%bnd_names = opt_bnd_names
+    else
+      allocate(mesh%bnd_names(6))
+      mesh%bnd_names(left) = "left"
+      mesh%bnd_names(right) = "right"
+      mesh%bnd_names(bottom) = "bottom"
+      mesh%bnd_names(top) = "top"
+      mesh%bnd_names(back) = "back"
+      mesh%bnd_names(front) = "front"
+    end if
+    if (is_root(par_env)) then
+      print *, "Boundary ID map"
+      do i = 1, size(mesh%bnd_names)
+        print *, i, trim(mesh%bnd_names(i))
+      end do
+    end if
 
   end function build_mesh
 

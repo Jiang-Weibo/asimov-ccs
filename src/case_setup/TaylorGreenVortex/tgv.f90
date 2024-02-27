@@ -88,6 +88,8 @@ program tgv
 
   logical :: use_mpi_splitting
 
+  character(len=128), dimension(:), allocatable :: bnd_names
+  
   ! Launch MPI
   call initialise_parallel_environment(par_env)
   call timer_init()
@@ -140,7 +142,7 @@ program tgv
     mesh = build_mesh(par_env, shared_env, cps, cps, cps, domain_size)
   else
     if (irank == par_env%root) print *, "Reading mesh file"
-    call read_mesh(par_env, shared_env, case_name, mesh)
+    call read_mesh(par_env, shared_env, case_name, bnd_names, mesh)
   end if
   call set_mesh_object(mesh)
   call timer_stop(timer_index_build)
