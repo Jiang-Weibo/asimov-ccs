@@ -190,7 +190,6 @@ contains
       do i = 1, size(mesh%bnd_names)
         print *, i, trim(mesh%bnd_names(i))
       end do
-      print *, "=========================="
     end if
 
     if (-minval(mesh%topo%nb_indices) > size(mesh%bnd_names)) then
@@ -199,6 +198,7 @@ contains
     call sync(par_env)
     if (is_root(par_env)) then
       print *, "Boundary name list / ID compatibility: PASS"
+      print *, "=========================="
     end if
     
   end subroutine check_mesh_bnd_names
