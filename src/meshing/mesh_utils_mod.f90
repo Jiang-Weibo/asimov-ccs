@@ -172,13 +172,31 @@ contains
     call cleanup_topo(shared_env, mesh)
 
     mesh%bnd_names = bnd_names
+    call check_mesh_bnd_names(par_env, mesh)
+    
+  end subroutine read_mesh
+
+  !> Helper subroutine to check boundary ID/name compatibility.
+  subroutine check_mesh_bnd_names(par_env, mesh)
+
+    class(parallel_environment), intent(in) :: par_env
+    type(ccs_mesh), intent(in) :: mesh
+
+    integer :: i
+    
+    if (is_root(par_env)) then
+      print *, "Boundary ID map"
+      do i = 1, size(mesh%bnd_names)
+        print *, i, trim(mesh%bnd_names(i))
+      end do
+    end if
 
     if (-minval(mesh%topo%bnd_rid) > size(mesh%bnd_names)) then
       call error_abort("Boundary IDs exceed supplied boundary name count!")
     end if
     
-  end subroutine read_mesh
-
+  end subroutine check_mesh_bnd_names
+  
   !v Read the topology data from an input (HDF5) file
   ! This subroutine assumes the following names are used in the file:
   ! "ncel" - the total number of cells
@@ -972,8 +990,6 @@ contains
     type(ccs_mesh) :: mesh                             !< The resulting mesh.
 
     character(:), allocatable :: error_message
-
-    integer :: i
     
     if (cps * cps < par_env%num_procs) then
       error_message = "ERROR: Global number of cells < number of ranks. &
@@ -1005,12 +1021,7 @@ contains
       mesh%bnd_names(bottom) = "bottom"
       mesh%bnd_names(top) = "top"
     end if
-    if (is_root(par_env)) then
-      print *, "Boundary ID map"
-      do i = 1, size(mesh%bnd_names)
-        print *, i, trim(mesh%bnd_names(i))
-      end do
-    end if
+    call check_mesh_bnd_names(par_env, mesh)
   
   end function build_square_mesh
 
@@ -1591,8 +1602,6 @@ contains
     integer(ccs_int) :: timer_build_topo
     integer(ccs_int) :: timer_build_geo
     integer(ccs_int) :: timer_partitioner_input
-
-    integer :: i
     
     call timer_register("Build mesh topology", timer_build_topo)
     call timer_register("Compute partitioner input", timer_partitioner_input)
@@ -1641,13 +1650,8 @@ contains
       mesh%bnd_names(back) = "back"
       mesh%bnd_names(front) = "front"
     end if
-    if (is_root(par_env)) then
-      print *, "Boundary ID map"
-      do i = 1, size(mesh%bnd_names)
-        print *, i, trim(mesh%bnd_names(i))
-      end do
-    end if
-
+    call check_mesh_bnd_names(par_env, mesh)
+    
   end function build_mesh
 
   !v Utility constructor to build a 3D mesh with hex cells.
