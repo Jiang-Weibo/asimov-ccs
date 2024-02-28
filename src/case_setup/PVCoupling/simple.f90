@@ -69,7 +69,8 @@ program simple
 
   ! Create a square mesh
   print *, "Building mesh"
-  mesh = build_square_mesh(par_env, shared_env, cps, 1.0_ccs_real)
+  mesh = build_square_mesh(par_env, shared_env, cps, 1.0_ccs_real, &
+       ["left", "right", "bottom", "top"])
   call set_mesh_object(mesh)
 
   ! Initialise fields

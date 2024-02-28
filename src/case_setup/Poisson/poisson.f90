@@ -304,7 +304,8 @@ contains
     class(parallel_environment), allocatable :: par_env
     class(parallel_environment), allocatable :: shared_env
 
-    mesh = build_square_mesh(par_env, shared_env, cps, 1.0_ccs_real)
+    mesh = build_square_mesh(par_env, shared_env, cps, 1.0_ccs_real, &
+         ["left", "right", "bottom", "top"])
     call set_mesh_object(mesh)
 
   end subroutine initialise_poisson

@@ -36,7 +36,7 @@ program scalar_transport
                    allocate_fluid_fields, dealloc_fluid_fields, &
                    get_scheme_name
   use boundary_conditions, only: read_bc_config, allocate_bc_arrays
-  use read_config, only: get_boundary_count, get_store_residuals, get_variables, get_variable_types
+  use read_config, only: get_boundary_count, get_boundary_names, get_store_residuals, get_variables, get_variable_types
   use io_visualisation, only: write_solution
   use timestepping, only: set_timestep, activate_timestepping, initialise_old_values, finalise_timestep
 
@@ -75,6 +75,8 @@ program scalar_transport
   integer(ccs_int) :: t
 
   integer :: i
+
+  character(len=128), dimension(:), allocatable :: bnd_names
   
   ! Launch MPI
   call initialise_parallel_environment(par_env)
@@ -108,7 +110,8 @@ program scalar_transport
   ! Create a mesh
   if (irank == par_env%root) print *, "Building mesh"
   L = 1.0_ccs_real
-  mesh = build_mesh(par_env, shared_env, cps, cps, cps, L)   ! 3-D mesh
+  call get_boundary_names(ccs_config_file, bnd_names)
+  mesh = build_mesh(par_env, shared_env, cps, cps, cps, L, bnd_names)   ! 3-D mesh
   call set_mesh_object(mesh)
 
   ! Initialise fields
