@@ -51,7 +51,8 @@ program simple
   logical :: p_sol = .true.  ! Solve p
 
   type(fluid) :: flow_fields
-
+  character(len=128), dimension(4) :: bnd_names
+  
   ! Set start and end iteration numbers (eventually will be read from input file)
   it_start = 1
   it_end = 1000
@@ -69,8 +70,12 @@ program simple
 
   ! Create a square mesh
   print *, "Building mesh"
+  bnd_names(1) = "left"
+  bnd_names(2) = "right"
+  bnd_names(3) = "bottom"
+  bnd_names(4) = "top"
   mesh = build_square_mesh(par_env, shared_env, cps, 1.0_ccs_real, &
-       ["left", "right", "bottom", "top"])
+       bnd_names)
   call set_mesh_object(mesh)
 
   ! Initialise fields
