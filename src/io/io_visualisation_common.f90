@@ -31,6 +31,39 @@ contains
 
   end subroutine
 
+  !> Read the flow solution 
+  module subroutine read_solution(par_env, case_name, mesh, output_list, step, maxstep)
+
+    use parallel, only: timer
+    
+    ! Arguments
+    class(parallel_environment), allocatable, target, intent(in) :: par_env  !< The parallel environment
+    character(len=:), allocatable, intent(in) :: case_name                   !< The case name
+    type(ccs_mesh), intent(in) :: mesh                                       !< The mesh
+    type(field_ptr), dimension(:), intent(inout) :: output_list              !< List of fields to output
+    integer(ccs_int), optional, intent(in) :: step                           !< The current time-step count
+    integer(ccs_int), optional, intent(in) :: maxstep                        !< The maximum time-step count
+    integer(ccs_int) :: timer_index_read_field
+
+    call timer_register("Read fields time", timer_index_read_field)
+
+    ! Read the required fields ('heavy' data)
+    if (present(step) .and. present(maxstep)) then
+      ! Unsteady case
+      call timer_start(timer_index_read_field)
+      call read_fields(par_env, case_name, mesh, output_list, step, maxstep)
+      call timer_stop(timer_index_read_field)
+    else
+      ! Steady case
+      call timer_start(timer_index_read_field)
+      call read_fields(par_env, case_name, mesh, output_list)
+      call timer_stop(timer_index_read_field)
+    end if
+
+
+  end subroutine
+
+
   !> Write the flow solution for the current time-step to file
   module subroutine write_solution(par_env, case_name, mesh, output_list, step, maxstep, dt)
 

@@ -23,6 +23,79 @@ contains
 
   end subroutine
 
+  !> Read the field data to file
+  module subroutine read_fields(par_env, case_name, mesh, output_list, step, maxstep)
+
+    use kinds, only: ccs_long
+    use constants, only: ndim, adiosconfig
+    use types, only: cell_locator
+    use meshing, only: get_global_num_cells, create_cell_locator, get_global_index, get_local_num_cells
+
+    ! Arguments
+    class(parallel_environment), allocatable, target, intent(in) :: par_env  !< The parallel environment
+    character(len=:), allocatable, intent(in) :: case_name                   !< The case name
+    type(ccs_mesh), intent(in) :: mesh                                       !< The mesh
+    type(field_ptr), dimension(:), intent(inout) :: output_list              !< List of fields to output
+    integer(ccs_int), optional, intent(in) :: step                           !< The current time-step count
+    integer(ccs_int), optional, intent(in) :: maxstep                        !< The maximum time-step count
+
+    ! Local variables
+    character(len=:), allocatable :: sol_file     ! Solution file name
+    character(len=:), allocatable :: adios2_file  ! ADIOS2 config file name
+    integer(ccs_int) :: global_num_cells
+
+    class(io_environment), allocatable, save :: io_env
+    class(io_process), allocatable, save :: sol_reader
+
+    integer(ccs_long), dimension(1) :: sel_shape
+    integer(ccs_long), dimension(1) :: sel_start
+    integer(ccs_long), dimension(1) :: sel_count
+
+    type(cell_locator) :: loc_p
+    integer(ccs_int) :: index_global
+
+    sol_file = case_name // '.sol.h5'
+    adios2_file = case_name // adiosconfig
+
+    if (present(step)) then
+      ! Unsteady case
+      if (initial_step) then
+        call initialise_io(par_env, adios2_file, io_env)
+        call configure_io(io_env, "sol_reader", sol_reader)
+        call open_file(sol_file, "read", sol_reader)
+
+        initial_step = .false.
+      end if
+    else
+      ! Steady case
+      call initialise_io(par_env, adios2_file, io_env)
+      call configure_io(io_env, "sol_reader", sol_reader)
+      call open_file(sol_file, "read", sol_reader)
+    end if
+
+    call get_global_num_cells(global_num_cells)
+
+    ! Need to get data relating to first cell
+    call create_cell_locator(1, loc_p)
+
+    call get_global_index(loc_p, index_global)
+
+    ! 1D data
+    sel_shape(1) = global_num_cells
+    sel_start(1) = index_global - 1
+    call get_local_num_cells(sel_count(1))
+
+    ! 2D data
+    !sel2_shape(1) = ndim
+    !sel2_shape(2) = global_num_cells
+    !sel2_start(1) = 0
+    !sel2_start(2) = index_global - 1
+    !sel2_count(1) = ndim
+    !call get_local_num_cells(sel2_count(2))
+  
+  end subroutine
+
+
   !> Write the field data to file
   module subroutine write_fields(par_env, case_name, mesh, output_list, step, maxstep)
 
