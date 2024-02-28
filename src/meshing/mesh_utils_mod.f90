@@ -184,6 +184,10 @@ contains
 
     integer :: i
     integer :: bc_cnt
+
+    logical :: id_names_valid
+
+    integer :: ierr
     
     if (is_root(par_env)) then
       print *, "=========================="
@@ -194,8 +198,15 @@ contains
     end if
 
     bc_cnt = -minval(mesh%topo%nb_indices)
-    if ((bc_cnt /= size(mesh%bnd_names))) then
-      call error_abort("Boundary IDs exceed supplied boundary name count!")
+    id_names_valid = (bc_cnt == size(mesh%bnd_names))
+    select type(par_env)
+    type is (parallel_environment_mpi)
+      call MPI_Allreduce(MPI_IN_PLACE, id_names_valid, 1, MPI_LOGICAL, MPI_LOR, par_env%comm, ierr)
+    class default
+      call error_abort("Unsupported parallel environment")
+    end select
+    if (.not. id_names_valid) then
+      call error_abort("Maximum boundary ID doesn't match supplied boundary name count!")
     end if
     call sync(par_env)
     if (is_root(par_env)) then
