@@ -183,6 +183,7 @@ contains
     type(ccs_mesh), intent(in) :: mesh
 
     integer :: i
+    integer :: bc_cnt
     
     if (is_root(par_env)) then
       print *, "=========================="
@@ -192,7 +193,8 @@ contains
       end do
     end if
 
-    if (-minval(mesh%topo%nb_indices) > size(mesh%bnd_names)) then
+    bc_cnt = -minval(mesh%topo%nb_indices)
+    if ((bc_cnt /= size(mesh%bnd_names))) then
       call error_abort("Boundary IDs exceed supplied boundary name count!")
     end if
     call sync(par_env)
@@ -983,7 +985,7 @@ contains
   !v Utility constructor to build a 2D mesh with hex cells.
   !
   !  Builds a Cartesian grid of nx*ny cells.
-  function build_square_mesh(par_env, shared_env, cps, side_length, opt_bnd_names) result(mesh)
+  function build_square_mesh(par_env, shared_env, cps, side_length, bnd_names) result(mesh)
 
     use partitioning, only: compute_partitioner_input
 
@@ -991,7 +993,7 @@ contains
     class(parallel_environment), allocatable, target, intent(in) :: shared_env !< The shared memory environment
     integer(ccs_int), intent(in) :: cps                !< Number of cells per side of the mesh.
     real(ccs_real), intent(in) :: side_length          !< The length of the side.
-    character(len=128), dimension(4), intent(in), optional :: opt_bnd_names !< Boundary name list
+    character(len=128), dimension(4), intent(in) :: bnd_names !< Boundary name list
     
     type(ccs_mesh) :: mesh                             !< The resulting mesh.
 
@@ -1018,15 +1020,7 @@ contains
     call cleanup_topo(shared_env, mesh)
 
     ! Create boundary names list
-    if (present(opt_bnd_names)) then
-      mesh%bnd_names = opt_bnd_names
-    else
-      allocate(mesh%bnd_names(4))
-      mesh%bnd_names(left) = "left"
-      mesh%bnd_names(right) = "right"
-      mesh%bnd_names(bottom) = "bottom"
-      mesh%bnd_names(top) = "top"
-    end if
+    mesh%bnd_names = bnd_names
     call check_mesh_bnd_names(par_env, mesh)
   
   end function build_square_mesh
@@ -1587,7 +1581,7 @@ contains
   !v Utility constructor to build a 3D mesh with hex cells.
   !
   !  Builds a Cartesian grid of nx*ny*nz cells.
-  function build_mesh(par_env, shared_env, nx, ny, nz, side_length, opt_bnd_names) result(mesh)
+  function build_mesh(par_env, shared_env, nx, ny, nz, side_length, bnd_names) result(mesh)
 
     use partitioning, only: compute_partitioner_input
     use parallel, only: timer
@@ -1599,7 +1593,7 @@ contains
     integer(ccs_int), intent(in) :: ny                 !< Number of cells in the y direction.
     integer(ccs_int), intent(in) :: nz                 !< Number of cells in the z direction.
     real(ccs_real), intent(in) :: side_length          !< The length of the side.
-    character(len=128), dimension(6), intent(in), optional :: opt_bnd_names
+    character(len=128), dimension(6), intent(in) :: bnd_names
     
     type(ccs_mesh) :: mesh                             !< The resulting mesh.
 
@@ -1645,17 +1639,7 @@ contains
     call cleanup_topo(shared_env, mesh)
 
     ! Create boundary names list
-    if (present(opt_bnd_names)) then
-      mesh%bnd_names = opt_bnd_names
-    else
-      allocate(mesh%bnd_names(6))
-      mesh%bnd_names(left) = "left"
-      mesh%bnd_names(right) = "right"
-      mesh%bnd_names(bottom) = "bottom"
-      mesh%bnd_names(top) = "top"
-      mesh%bnd_names(back) = "back"
-      mesh%bnd_names(front) = "front"
-    end if
+    mesh%bnd_names = bnd_names
     call check_mesh_bnd_names(par_env, mesh)
     
   end function build_mesh

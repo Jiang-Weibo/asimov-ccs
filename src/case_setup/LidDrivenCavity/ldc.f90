@@ -38,7 +38,7 @@ program ldc
                    get_field, add_field, set_is_field_solved, &
                    allocate_fluid_fields, dealloc_fluid_fields
   use boundary_conditions, only: read_bc_config, allocate_bc_arrays
-  use read_config, only: get_variables, get_boundary_count, get_store_residuals
+  use read_config, only: get_variables, get_boundary_count, get_boundary_names, get_store_residuals
   use io_visualisation, only: write_solution
   use timers, only: timer_init, timer_register_start, timer_register, timer_start, timer_stop, timer_print, timer_print_all
 
@@ -76,6 +76,8 @@ program ldc
 
   logical :: use_mpi_splitting
 
+  character(len=128), dimension(:), allocatable :: bnd_names
+  
   ! Launch MPI
   call initialise_parallel_environment(par_env)
   call timer_init()
@@ -117,8 +119,9 @@ program ldc
 
   ! Create a mesh
   if (irank == par_env%root) print *, "Building mesh"
-  !mesh = build_mesh(par_env, cps, cps, cps, 1.0_ccs_real)   ! 3-D mesh
-  mesh = build_square_mesh(par_env, shared_env, cps, 1.0_ccs_real)      ! 2-D mesh
+  call get_boundary_names(ccs_config_file, bnd_names)
+  !mesh = build_mesh(par_env, cps, cps, cps, 1.0_ccs_real, bnd_names)   ! 3-D mesh
+  mesh = build_square_mesh(par_env, shared_env, cps, 1.0_ccs_real, bnd_names)      ! 2-D mesh
   call set_mesh_object(mesh)
 
   ! Initialise fields
