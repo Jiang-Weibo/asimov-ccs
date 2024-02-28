@@ -3,6 +3,7 @@ program test_square_mesh_indices
 
   use testing_lib
 
+  use ccs_base, only: bnd_names_default
   use meshing, only: create_cell_locator, get_global_index, get_local_num_cells, get_global_num_cells
   use meshing, only: get_total_num_cells
   use meshing, only: set_mesh_object, nullify_mesh_object
@@ -29,7 +30,8 @@ program test_square_mesh_indices
   do mctr = 1, size(m)
     n = m(mctr)
     l = parallel_random(par_env)
-    mesh = build_square_mesh(par_env, shared_env, n, l)
+    mesh = build_square_mesh(par_env, shared_env, n, l, &
+         bnd_names_default(1:4))
     call set_mesh_object(mesh)
 
     call get_local_num_cells(nlocal)

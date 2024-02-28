@@ -5,6 +5,7 @@ program test_sources
 
   use testing_lib
 
+  use ccs_base, only: bnd_names_default
   use types, only: ccs_matrix, ccs_mesh, ccs_vector
 
   use meshing, only: get_centre, get_local_num_cells, &
@@ -142,7 +143,8 @@ contains
     real(ccs_real), dimension(:), pointer :: S_data
     
     ! Initialise mesh
-    mesh = build_mesh(par_env, shared_env, n, n, n, l)
+    mesh = build_mesh(par_env, shared_env, n, n, n, l, &
+         bnd_names_default)
     call set_mesh_object(mesh)
 
     ! Initialise vectors

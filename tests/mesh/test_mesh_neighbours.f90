@@ -5,6 +5,7 @@ program test_mesh_neighbours
 
   use testing_lib
 
+  use ccs_base, only: bnd_names_default
   use meshing, only: create_cell_locator, create_neighbour_locator, count_neighbours, &
                      get_boundary_status, get_local_num_cells, get_count_vertex_neighbours, &
                      get_local_index
@@ -48,7 +49,8 @@ program test_mesh_neighbours
     nz = n
 
     l = parallel_random(par_env)
-    mesh = build_mesh(par_env, shared_env, nx, ny, nz, l)
+    mesh = build_mesh(par_env, shared_env, nx, ny, nz, l, &
+         bnd_names_default)
     call set_mesh_object(mesh)
 
     vertex_boundary_ctr = 0

@@ -12,5 +12,7 @@ module ccs_base
 
   type(ccs_mesh), public :: mesh
 
-
+  character(len=6), dimension(6), parameter, public :: bnd_names_default = &
+       ["left  ", "right ", "bottom", "top   ", "back  ", "front "]
+  
 end module ccs_base

@@ -6,6 +6,7 @@ program test_mesh_centres
 
   use testing_lib
 
+  use ccs_base, only: bnd_names_default
   use constants, only: ndim
   use meshing, only: create_cell_locator, create_face_locator, create_vert_locator, get_centre, &
                      get_local_num_cells, get_vert_per_cell
@@ -46,7 +47,8 @@ program test_mesh_centres
     nz = n
 
     l = parallel_random(par_env)
-    mesh = build_mesh(par_env, shared_env, nx, ny, nz, l)
+    mesh = build_mesh(par_env, shared_env, nx, ny, nz, l, &
+         bnd_names_default)
     call set_mesh_object(mesh)
 
     call get_local_num_cells(local_num_cells)

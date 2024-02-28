@@ -6,6 +6,7 @@ program test_mesh_square_mesh_closed
 
   use testing_lib
 
+  use ccs_base, only: bnd_names_default
   use constants
 
   use meshing, only: create_face_locator, get_face_normal, get_face_area, get_local_num_cells
@@ -37,7 +38,8 @@ program test_mesh_square_mesh_closed
     n = m(mctr)
 
     l = parallel_random(par_env)
-    mesh = build_square_mesh(par_env, shared_env, n, l)
+    mesh = build_square_mesh(par_env, shared_env, n, l, &
+         bnd_names_default(1:4))
     call set_mesh_object(mesh)
 
     A_expected = l / n
