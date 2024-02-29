@@ -942,7 +942,6 @@ contains
           call get_local_index(loc_nb, boundary_id)
           boundary_id = -boundary_id
           if (boundary_id == id) then
-            print *, "Adding boundary ", i, j
             call create_face_locator(i, j, loc_f)
             faces = [faces, loc_f]
           end if
