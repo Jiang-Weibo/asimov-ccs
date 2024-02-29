@@ -52,6 +52,7 @@ module meshing
   public :: set_face_interpolation
   public :: get_mesh_generated, set_mesh_generated
   public :: get_bc_id
+  public :: find_entities
   
   interface get_centre
     module procedure get_cell_centre
@@ -133,6 +134,10 @@ module meshing
     module procedure get_vertex_neighbour_local_status
   end interface get_local_status
 
+  interface find_entities
+    module procedure find_face_entities
+  end interface find_entities
+  
   interface
 
     module subroutine set_mesh_object(input_mesh)
@@ -587,6 +592,13 @@ module meshing
       integer(ccs_int), intent(out) :: bc_id !< The boundary ID
     end subroutine get_bc_id
 
+    !> Find a list of (boundary) faces based on their boundary name
+    module subroutine find_face_entities(mesh, name, faces)
+      type(ccs_mesh), intent(in) :: mesh                                  !< The mesh
+      character(len=*), intent(in) :: name                                !< The boundary name
+      type(face_locator), dimension(:), allocatable, intent(out) :: faces !< The list of boundary faces
+    end subroutine find_face_entities
+    
   end interface
 
 end module meshing
