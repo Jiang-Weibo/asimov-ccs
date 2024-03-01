@@ -119,9 +119,6 @@ contains
     sel2_count(1) = ndim
     call get_local_num_cells(sel2_count(2))
 
-    ! Begin step
-    call begin_step(sol_reader)
-
      ! Loop over output list and write out
     call timer_start(timer_index_output)
     do i = 1, size(output_list)
@@ -132,32 +129,26 @@ contains
       call get_natural_data(par_env, mesh, output_list(i)%ptr%values, data)
       call timer_stop(timer_index_nat_data_output)
       data_name = "/" // trim(output_list(i)%name)
-      print*, "data_name=",data_name,"sel_start=",sel_start,"sel_count=",sel2_count
+      print*, "data_name=",data_name," sel_start=",sel_start," sel_count=",sel_count
 
       call read_array(sol_reader, trim(data_name), sel_start, sel_count, data)
 
       call get_vector_data(output_list(i)%ptr%values, output_data)
+      output_data = data
+
       !do index_p = 1, n_local
       do index_p = 1, 9
         print*, index_p, output_data(index_p)
       end do
 
-    end do
-
-    do i = 1, size(output_list)
       call restore_vector_data(output_list(i)%ptr%values, output_data)
     end do
-    call timer_stop(timer_index_output)
 
-    ! End step
-    call end_step(sol_reader)
+    call timer_stop(timer_index_output)
 
     if (allocated(data)) then
       deallocate (data)
     end if
-
-    ! End step
-    call end_step(sol_reader)
 
     ! Close the file and finalise ADIOS2 IO environment
     if (present(step)) then
