@@ -31,8 +31,8 @@ program ldc
   use meshing, only: set_mesh_object, nullify_mesh_object
   use parallel_types, only: parallel_environment
   use mesh_utils, only: build_mesh, write_mesh, build_square_mesh
-  use meshing, only: get_global_num_cells
-  use vec, only: create_vector, set_vector_location
+  use meshing, only: get_global_num_cells, get_local_num_cells
+  use vec, only: create_vector, set_vector_location, get_vector_data, restore_vector_data
   use petsctypes, only: vector_petsc
   use pv_coupling, only: solve_nonlinear
   use utils, only: set_size, initialise, update, exit_print, add_field_to_outputlist, &
@@ -40,7 +40,7 @@ program ldc
                    allocate_fluid_fields, dealloc_fluid_fields
   use boundary_conditions, only: read_bc_config, allocate_bc_arrays
   use read_config, only: get_variables, get_boundary_count, get_store_residuals
-  use io_visualisation, only: write_solution
+  use io_visualisation, only: write_solution, read_solution
   use timers, only: timer_init, timer_register_start, timer_register, timer_start, timer_stop, timer_print, timer_print_all
 
   implicit none
@@ -51,6 +51,10 @@ program ldc
   character(len=:), allocatable :: case_path  ! Path to input directory with case name appended
   character(len=:), allocatable :: ccs_config_file ! Config file for CCS
   character(len=ccs_string_len), dimension(:), allocatable :: variable_names  ! variable names for BC reading
+
+  real(ccs_real), dimension(:), pointer :: output_data
+  integer(ccs_int) :: index_p
+  integer(ccs_int) :: n_local
 
   type(vector_spec) :: vec_properties
 
@@ -199,6 +203,16 @@ program ldc
   call add_field(mf, flow_fields)
   call add_field(viscosity, flow_fields) 
   call add_field(density, flow_fields)  
+
+  call read_solution(par_env, case_path, mesh, output_list)
+  call get_vector_data(output_list(1)%ptr%values, output_data)
+  
+  call get_local_num_cells(n_local)
+  !do index_p = 1, n_local
+    !print*, index_p, output_data(index_p)
+  !end do
+
+  call restore_vector_data(output_list(1)%ptr%values, output_data)
 
   if (irank == par_env%root) then
     call print_configuration()

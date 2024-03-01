@@ -5,7 +5,7 @@ submodule(io_visualisation) io_visualisation_adios2
 #include "ccs_macros.inc"
 
   use io, only: initialise_io, cleanup_io, configure_io, open_file, close_file, &
-                write_array
+                write_array, read_array
   use adios2
   use adios2_types, only: adios2_io_process
   use utils, only: exit_print
@@ -30,6 +30,8 @@ contains
     use constants, only: ndim, adiosconfig
     use types, only: cell_locator
     use meshing, only: get_global_num_cells, create_cell_locator, get_global_index, get_local_num_cells
+    use utils, only: get_natural_data
+    use vec, only: get_vector_data, restore_vector_data
 
     ! Arguments
     class(parallel_environment), allocatable, target, intent(in) :: par_env  !< The parallel environment
@@ -42,6 +44,7 @@ contains
     ! Local variables
     character(len=:), allocatable :: sol_file     ! Solution file name
     character(len=:), allocatable :: adios2_file  ! ADIOS2 config file name
+    character(len=:), allocatable :: data_name    ! String for storing data path in file
     integer(ccs_int) :: global_num_cells
 
     class(io_environment), allocatable, save :: io_env
@@ -51,11 +54,34 @@ contains
     integer(ccs_long), dimension(1) :: sel_start
     integer(ccs_long), dimension(1) :: sel_count
 
+    integer(ccs_long), dimension(2) :: sel2_shape
+    integer(ccs_long), dimension(2) :: sel2_start
+    integer(ccs_long), dimension(2) :: sel2_count
+
+    real(ccs_real), dimension(:), allocatable :: data
+
+    integer(ccs_int) :: timer_index_nat_data_output
+    integer(ccs_int) :: timer_index_nat_data
+    integer(ccs_int) :: timer_index_output
+    integer(ccs_int) :: timer_index_grad
+
+    integer(ccs_int) :: i
+
     type(cell_locator) :: loc_p
     integer(ccs_int) :: index_global
 
+    real(ccs_long), dimension(:), pointer :: output_data
+    integer(ccs_int) :: index_p
+
     sol_file = case_name // '.sol.h5'
+    print*,"sol_file=",sol_file
     adios2_file = case_name // adiosconfig
+    print*, "adios2_file=", adios2_file
+
+    call timer_register("Get natural data (output)", timer_index_nat_data_output)
+    call timer_register("Get natural data (grads)", timer_index_nat_data)
+    call timer_register("Write output time", timer_index_output)
+    call timer_register("Write gradients time", timer_index_grad)
 
     if (present(step)) then
       ! Unsteady case
@@ -86,12 +112,65 @@ contains
     call get_local_num_cells(sel_count(1))
 
     ! 2D data
-    !sel2_shape(1) = ndim
-    !sel2_shape(2) = global_num_cells
-    !sel2_start(1) = 0
-    !sel2_start(2) = index_global - 1
-    !sel2_count(1) = ndim
-    !call get_local_num_cells(sel2_count(2))
+    sel2_shape(1) = ndim
+    sel2_shape(2) = global_num_cells
+    sel2_start(1) = 0
+    sel2_start(2) = index_global - 1
+    sel2_count(1) = ndim
+    call get_local_num_cells(sel2_count(2))
+
+    ! Begin step
+    call begin_step(sol_reader)
+
+     ! Loop over output list and write out
+    call timer_start(timer_index_output)
+    do i = 1, size(output_list)
+      ! Check whether pointer is associated with a field
+      if (.not. associated(output_list(i)%ptr)) exit
+
+      call timer_start(timer_index_nat_data_output)
+      call get_natural_data(par_env, mesh, output_list(i)%ptr%values, data)
+      call timer_stop(timer_index_nat_data_output)
+      data_name = "/" // trim(output_list(i)%name)
+      print*, "data_name=",data_name,"sel_start=",sel_start,"sel_count=",sel2_count
+
+      call read_array(sol_reader, trim(data_name), sel_start, sel_count, data)
+
+      call get_vector_data(output_list(i)%ptr%values, output_data)
+      !do index_p = 1, n_local
+      do index_p = 1, 9
+        print*, index_p, output_data(index_p)
+      end do
+
+    end do
+
+    do i = 1, size(output_list)
+      call restore_vector_data(output_list(i)%ptr%values, output_data)
+    end do
+    call timer_stop(timer_index_output)
+
+    ! End step
+    call end_step(sol_reader)
+
+    if (allocated(data)) then
+      deallocate (data)
+    end if
+
+    ! End step
+    call end_step(sol_reader)
+
+    ! Close the file and finalise ADIOS2 IO environment
+    if (present(step)) then
+      ! Unsteady case
+      if (step == maxstep) then
+        call close_file(sol_reader)
+        call cleanup_io(io_env)
+      end if
+    else
+      ! Steady case
+      call close_file(sol_reader)
+      call cleanup_io(io_env)
+    end if
   
   end subroutine
 
@@ -148,8 +227,13 @@ contains
     type(cell_locator) :: loc_p
     integer(ccs_int) :: index_global
 
+    real(ccs_real), dimension(:), pointer :: output_data
+    integer(ccs_int) :: index_p
+
     sol_file = case_name // '.sol.h5'
+    print*,"sol_file=",sol_file
     adios2_file = case_name // adiosconfig
+    print*, "adios2_file=", adios2_file
 
     call timer_register("Get natural data (output)", timer_index_nat_data_output)
     call timer_register("Get natural data (grads)", timer_index_nat_data)
@@ -206,6 +290,12 @@ contains
       call timer_stop(timer_index_nat_data_output)
       data_name = "/" // trim(output_list(i)%name)
       call write_array(sol_writer, data_name, sel_shape, sel_start, sel_count, data)
+      print*,data_name
+      call get_vector_data(output_list(i)%ptr%values, output_data)
+      !do index_p = 1, n_local
+      do index_p = 1, 9
+        print*, index_p, output_data(index_p)
+      end do
 
       ! Store residuals if available
       if (allocated(output_list(i)%ptr%residuals)) then
@@ -216,6 +306,9 @@ contains
         call write_array(sol_writer, data_name, sel_shape, sel_start, sel_count, data)
       end if
       
+    end do
+    do i = 1, size(output_list)
+      call restore_vector_data(output_list(i)%ptr%values, output_data)
     end do
     call timer_stop(timer_index_output)
    

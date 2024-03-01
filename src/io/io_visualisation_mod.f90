@@ -16,6 +16,8 @@ module io_visualisation
   public :: write_solution
   public :: write_fields
   public :: write_xdmf
+  public :: read_solution
+  public :: read_fields
 
   interface
 
@@ -52,6 +54,17 @@ module io_visualisation
     module subroutine write_xdmf(par_env, case_name, output_list, step, maxstep, dt)
       class(parallel_environment), allocatable, target, intent(in) :: par_env  !< The parallel environment
       character(len=:), allocatable, intent(in) :: case_name                   !< The case name
+      type(field_ptr), dimension(:), intent(inout) :: output_list              !< List of fields to output
+      integer(ccs_int), optional, intent(in) :: step                           !< The current time-step count
+      integer(ccs_int), optional, intent(in) :: maxstep                        !< The maximum time-step count
+      real(ccs_real), optional, intent(in) :: dt                               !< The time-step size
+    end subroutine
+
+    !> Read the flow solution for the current time-step to file
+    module subroutine read_solution(par_env, case_name, mesh, output_list, step, maxstep, dt)
+      class(parallel_environment), allocatable, target, intent(in) :: par_env  !< The parallel environment
+      character(len=:), allocatable, intent(in) :: case_name                   !< The case name
+      type(ccs_mesh), intent(in) :: mesh                                       !< The mesh
       type(field_ptr), dimension(:), intent(inout) :: output_list              !< List of fields to output
       integer(ccs_int), optional, intent(in) :: step                           !< The current time-step count
       integer(ccs_int), optional, intent(in) :: maxstep                        !< The maximum time-step count

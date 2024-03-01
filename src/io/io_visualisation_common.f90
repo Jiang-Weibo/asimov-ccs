@@ -46,7 +46,8 @@ contains
     integer(ccs_int) :: timer_index_read_field
 
     call timer_register("Read fields time", timer_index_read_field)
-
+    
+    print*, "read solution----------------------------------------------------"
     ! Read the required fields ('heavy' data)
     if (present(step) .and. present(maxstep)) then
       ! Unsteady case
@@ -82,6 +83,7 @@ contains
 
     call timer_register("Write fields time", timer_index_write_field)
     call timer_register("Write xdmf time", timer_index_write_xdmf)
+    print*, "write solution----------------------------------------------------"
 
     ! Write the required fields ('heavy' data)
     if (present(step) .and. present(maxstep)) then
