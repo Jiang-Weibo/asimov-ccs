@@ -14,7 +14,7 @@ program sandia
                        field_u, field_v, field_w, field_p, field_p_prime, field_mf, field_viscosity, field_density, &
                        cell_centred_central, cell_centred_upwind, face_centred, &
                        ccs_split_type_shared, ccs_split_type_low_high, ccs_split_undefined
-  use meshing, only: set_mesh_object, nullify_mesh_object
+  use meshing, only: set_mesh_object, nullify_mesh_object, get_local_num_cells
   use kinds, only: ccs_real, ccs_int, ccs_long
   use types, only: field, field_spec, upwind_field, central_field, face_field, ccs_mesh, &
                    vector_spec, ccs_vector, io_environment, io_process, &
@@ -26,7 +26,7 @@ program sandia
                       cleanup_parallel_environment, timer, &
                       read_command_line_arguments, sync, query_stop_run, create_new_par_env, is_root
   use parallel_types, only: parallel_environment
-  use vec, only: create_vector, set_vector_location
+  use vec, only: create_vector, set_vector_location, get_vector_data, restore_vector_data
   use petsctypes, only: vector_petsc
   use pv_coupling, only: solve_nonlinear
   use scalars, only: update_scalars
@@ -40,7 +40,7 @@ program sandia
   use mesh_utils, only: read_mesh, write_mesh
   use partitioning, only: compute_partitioner_input, &
                           partition_kway, compute_connectivity
-  use io_visualisation, only: write_solution
+  use io_visualisation, only: write_solution, read_solution
   use fv, only: update_gradient
   use utils, only: str
   use timers, only: timer_init, timer_register_start, timer_register, timer_start, timer_stop, &
@@ -54,6 +54,10 @@ program sandia
   character(len=:), allocatable:: case_path  ! Path to input directory with case name appended
   character(len=:), allocatable:: ccs_config_file  ! Config file for CCS
   character(len = ccs_string_len), dimension(:), allocatable:: variable_names  ! variable names for BC reading
+
+  real(ccs_real), dimension(:), pointer :: output_data
+  integer(ccs_int) :: index_p
+  integer(ccs_int) :: n_local
 
   type(vector_spec):: vec_properties
 
@@ -238,6 +242,16 @@ program sandia
   call timer_stop(timer_index_init)
   call timer_register("I/O time for solution", timer_index_io_sol)
   call timer_register_start("Solver time inc I/O", timer_index_sol)
+
+  call read_solution(par_env, case_path, mesh, output_list)
+  call get_vector_data(output_list(1)%ptr%values, output_data)
+
+  call get_local_num_cells(n_local)
+  do index_p = 1, n_local
+    print*, index_p, output_data(index_p)
+  end do
+
+  call restore_vector_data(output_list(1)%ptr%values, output_data)
 
   do t = 1, num_steps
     call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
