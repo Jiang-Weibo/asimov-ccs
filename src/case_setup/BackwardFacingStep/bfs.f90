@@ -26,7 +26,7 @@ program bfs
                       read_command_line_arguments, sync, &
                       create_new_par_env
   use parallel_types, only: parallel_environment
-  use vec, only: create_vector, set_vector_location
+  use vec, only: create_vector, set_vector_location, get_vector_data, restore_vector_data
   use petsctypes, only: vector_petsc
   use pv_coupling, only: solve_nonlinear
   use utils, only: set_size, initialise, update, exit_print, &
@@ -37,10 +37,10 @@ program bfs
   use read_config, only: get_variables, get_boundary_count, get_case_name, get_store_residuals, get_enable_cell_corrections
   use timestepping, only: set_timestep, activate_timestepping, initialise_old_values
   use mesh_utils, only: read_mesh, write_mesh
-  use meshing, only: set_mesh_object, nullify_mesh_object
+  use meshing, only: set_mesh_object, nullify_mesh_object, get_local_num_cells
   use partitioning, only: compute_partitioner_input, &
                           partition_kway, compute_connectivity
-  use io_visualisation, only: write_solution
+  use io_visualisation, only: write_solution, read_solution
   use fv, only: update_gradient
   use utils, only: str
 
@@ -52,6 +52,10 @@ program bfs
   character(len=:), allocatable :: case_path  ! Path to input directory with case name appended
   character(len=:), allocatable :: ccs_config_file ! Config file for CCS
   character(len=ccs_string_len), dimension(:), allocatable :: variable_names  ! variable names for BC reading
+
+  real(ccs_real), dimension(:), pointer :: output_data
+  integer(ccs_int) :: index_p
+  integer(ccs_int) :: n_local
 
   type(vector_spec) :: vec_properties
 
@@ -223,6 +227,16 @@ program bfs
   call add_field(mf, flow_fields)
   call add_field(viscosity, flow_fields) 
   call add_field(density, flow_fields)  
+
+  call read_solution(par_env, case_path, mesh, output_list)
+  call get_vector_data(output_list(1)%ptr%values, output_data)
+
+  call get_local_num_cells(n_local)
+  do index_p = 1, n_local
+    print*, index_p, output_data(index_p)
+  end do
+
+  call restore_vector_data(output_list(1)%ptr%values, output_data)
 
   do t = 1, num_steps
     call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
