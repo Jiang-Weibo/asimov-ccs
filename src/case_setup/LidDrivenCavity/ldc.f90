@@ -208,9 +208,9 @@ program ldc
   call get_vector_data(output_list(1)%ptr%values, output_data)
   
   call get_local_num_cells(n_local)
-  !do index_p = 1, n_local
-    !print*, index_p, output_data(index_p)
-  !end do
+  do index_p = 1, n_local
+    print*, index_p, output_data(index_p)
+  end do
 
   call restore_vector_data(output_list(1)%ptr%values, output_data)
 

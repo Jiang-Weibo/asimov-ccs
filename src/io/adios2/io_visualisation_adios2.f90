@@ -137,9 +137,9 @@ contains
       output_data = data
 
       !do index_p = 1, n_local
-      do index_p = 1, 9
-        print*, index_p, output_data(index_p)
-      end do
+      !do index_p = 1, 9
+        !print*, index_p, output_data(index_p)
+      !end do
 
       call restore_vector_data(output_list(i)%ptr%values, output_data)
     end do
