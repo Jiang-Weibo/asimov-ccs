@@ -32,6 +32,7 @@ contains
     use meshing, only: get_global_num_cells, create_cell_locator, get_global_index, get_local_num_cells
     use utils, only: get_natural_data
     use vec, only: get_vector_data, restore_vector_data
+    use io, only: get_num_steps
 
     ! Arguments
     class(parallel_environment), allocatable, target, intent(in) :: par_env  !< The parallel environment
@@ -66,6 +67,8 @@ contains
     integer(ccs_int) :: timer_index_grad
 
     integer(ccs_int) :: i
+
+    integer(ccs_long) :: steps
 
     type(cell_locator) :: loc_p
     integer(ccs_int) :: index_global
@@ -119,6 +122,10 @@ contains
     sel2_count(1) = ndim
     call get_local_num_cells(sel2_count(2))
 
+    ! Get number of steps in solution file
+    call get_num_steps(sol_reader, steps)
+    steps = steps - 1  ! Set to max. step (count starts from 0)
+
      ! Loop over output list and write out
     call timer_start(timer_index_output)
     do i = 1, size(output_list)
@@ -131,7 +138,7 @@ contains
       data_name = "/" // trim(output_list(i)%name)
       print*, "data_name=",data_name," sel_start=",sel_start," sel_count=",sel_count
 
-      call read_array(sol_reader, trim(data_name), sel_start, sel_count, data)
+      call read_array(sol_reader, trim(data_name), sel_start, sel_count, data, steps)
 
       call get_vector_data(output_list(i)%ptr%values, output_data)
       output_data = data
@@ -145,6 +152,8 @@ contains
     end do
 
     call timer_stop(timer_index_output)
+
+    !call end_step(sol_reader)
 
     if (allocated(data)) then
       deallocate (data)

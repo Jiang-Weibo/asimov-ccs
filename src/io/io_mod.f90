@@ -7,7 +7,7 @@ module io
   use types, only: io_environment, io_process
   use parallel_types, only: parallel_environment
   use constants, only: ndim, adiosconfig
-  use kinds, only: ccs_int, ccs_real
+  use kinds, only: ccs_int, ccs_real, ccs_long
 
   implicit none
 
@@ -18,6 +18,7 @@ module io
   public :: configure_io
   public :: open_file
   public :: close_file
+  public :: get_num_steps
   public :: read_scalar
   public :: read_array
   public :: write_scalar
@@ -90,6 +91,11 @@ module io
     !> Close file
     module subroutine close_file(io_proc)
       class(io_process), intent(inout) :: io_proc !< IO process
+    end subroutine
+
+    module subroutine get_num_steps(io_proc, steps)
+      class(io_process), intent(inout) :: io_proc
+      integer(ccs_long), intent(out) :: steps
     end subroutine
 
     !> Read a scalar integer from file
@@ -166,12 +172,13 @@ module io
     end subroutine
 
     !> Read a 1D 64-bit real array from file
-    module subroutine read_array_real64_1D(io_proc, var_name, global_start, count, var)
+    module subroutine read_array_real64_1D(io_proc, var_name, global_start, count, var, step)
       class(io_process), intent(in) :: io_proc                 !< IO process used for reading
       character(len=*), intent(in) :: var_name                 !< Name of real array to read
       integer(int64), dimension(1), intent(in) :: global_start !< What global index to start reading from
       integer(int64), dimension(1), intent(in) :: count        !< How many array element to read
       real(real64), dimension(:), intent(inout) :: var         !< The 1D real array
+      integer(int64), optional, intent(in) :: step
     end subroutine
 
     !> Read a 2D 32-bit real array from file
