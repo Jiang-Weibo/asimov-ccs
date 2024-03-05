@@ -24,7 +24,7 @@ module poiseuille_core
                       cleanup_parallel_environment, timer, &
                       read_command_line_arguments, sync
   use parallel_types, only: parallel_environment
-  use vec, only: create_vector, set_vector_location
+  use vec, only: create_vector, set_vector_location, get_vector_data, restore_vector_data
   use petsctypes, only: vector_petsc
   use pv_coupling, only: solve_nonlinear
   use utils, only: set_size, initialise, update, exit_print, &
@@ -36,10 +36,10 @@ module poiseuille_core
   use read_config, only: get_variables, get_boundary_count, get_case_name, get_enable_cell_corrections
   use timestepping, only: set_timestep, activate_timestepping, initialise_old_values, reset_timestepping
   use mesh_utils, only: read_mesh, build_square_mesh, write_mesh, compute_face_interpolation
-  use meshing, only: get_total_num_cells, get_global_num_cells, set_mesh_object, nullify_mesh_object
+  use meshing, only: get_total_num_cells, get_global_num_cells, set_mesh_object, nullify_mesh_object, get_local_num_cells
   use partitioning, only: compute_partitioner_input, &
                           partition_kway, compute_connectivity
-  use io_visualisation, only: write_solution, reset_io_visualisation
+  use io_visualisation, only: write_solution, reset_io_visualisation, read_solution
   use fv, only: update_gradient
   use utils, only: str
   use timers, only: timer_init, timer_register_start, timer_register, timer_start, timer_stop, &
@@ -61,6 +61,10 @@ module poiseuille_core
     character(len=:), allocatable :: input_path  ! Path to input directory
     character(len=:), allocatable :: case_path  ! Path to input directory with case name appended
     character(len=:), allocatable :: ccs_config_file ! Config file for CCS
+
+    real(ccs_real), dimension(:), pointer :: output_data
+    integer(ccs_int) :: index_p
+    integer(ccs_int) :: n_local
 
     type(vector_spec) :: vec_properties
 
@@ -232,6 +236,17 @@ module poiseuille_core
 
     call timer_stop(timer_index_init)
     call timer_register_start("Solver time inc I/O", timer_index_sol)
+
+    call read_solution(par_env, case_path, mesh, output_list)
+    call get_vector_data(output_list(1)%ptr%values, output_data)
+
+    call get_local_num_cells(n_local)
+    do index_p = 1, n_local
+      print*, index_p, output_data(index_p)
+    end do
+
+    call restore_vector_data(output_list(1)%ptr%values, output_data)
+
 
     call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
                           fluid_sol, flow_fields)
