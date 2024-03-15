@@ -29,8 +29,9 @@ program scalar_transport
   use mesh_utils, only: build_mesh, write_mesh
   use meshing, only: get_global_num_cells, get_centre, count_neighbours, &
                      create_cell_locator, create_face_locator, create_neighbour_locator, &
-                     get_local_index, get_boundary_status, get_face_normal, set_mesh_object, nullify_mesh_object
-  use vec, only: create_vector, set_vector_location
+                     get_local_index, get_boundary_status, get_face_normal, set_mesh_object, nullify_mesh_object, &
+                     get_local_num_cells
+  use vec, only: create_vector, set_vector_location, get_vector_data, restore_vector_data
   use scalars, only: update_scalars
   use utils, only: set_size, initialise, update, exit_print, add_field_to_outputlist, &
                    get_field, add_field, &
@@ -38,7 +39,7 @@ program scalar_transport
                    get_scheme_name
   use boundary_conditions, only: read_bc_config, allocate_bc_arrays
   use read_config, only: get_boundary_count, get_store_residuals, get_variables, get_variable_types
-  use io_visualisation, only: write_solution
+  use io_visualisation, only: write_solution, read_solution
   use timestepping, only: set_timestep, activate_timestepping, initialise_old_values, finalise_timestep
 
   implicit none
@@ -50,6 +51,10 @@ program scalar_transport
   character(len=:), allocatable :: ccs_config_file ! Config file for CCS
   character(len=ccs_string_len), dimension(:), allocatable :: variable_names ! variable names for BC reading
   integer(ccs_int), dimension(:), allocatable :: variable_types              ! cell centred upwind, central, etc.
+
+  real(ccs_real), dimension(:), pointer :: output_data
+  integer(ccs_int) :: index_p
+  integer(ccs_int) :: n_local
 
   type(vector_spec) :: vec_properties
 
@@ -189,6 +194,16 @@ program scalar_transport
   call add_field(density, flow_fields)
   call add_field(viscosity, flow_fields)
   call add_field(mf, flow_fields)
+
+  call read_solution(par_env, case_path, mesh, output_list)
+  call get_vector_data(output_list(1)%ptr%values, output_data)
+
+  call get_local_num_cells(n_local)
+  do index_p = 1, n_local
+    print*, index_p, output_data(index_p)
+  end do
+
+  call restore_vector_data(output_list(1)%ptr%values, output_data)
 
   if (irank == par_env%root) then
     call print_configuration()
