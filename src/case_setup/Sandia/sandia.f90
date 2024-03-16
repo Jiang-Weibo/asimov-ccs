@@ -34,7 +34,8 @@ program sandia
                    set_is_field_solved, &
                    allocate_fluid_fields
   use boundary_conditions, only: read_bc_config, allocate_bc_arrays, set_bc_profile
-  use read_config, only: get_variables, get_boundary_count, get_boundary_names, get_case_name, get_store_residuals, get_enable_cell_corrections
+  use read_config, only: get_variables, get_boundary_count, get_boundary_names, get_case_name, &
+                         get_store_residuals, get_enable_cell_corrections get_variable_types
   use timestepping, only: set_timestep, activate_timestepping, initialise_old_values
   use mesh_utils, only: read_mesh, write_mesh
   use partitioning, only: compute_partitioner_input, &
@@ -53,12 +54,13 @@ program sandia
   character(len=:), allocatable:: case_path  ! Path to input directory with case name appended
   character(len=:), allocatable:: ccs_config_file  ! Config file for CCS
   character(len = ccs_string_len), dimension(:), allocatable:: variable_names  ! variable names for BC reading
+  integer(ccs_int), dimension(:), allocatable :: variable_types              ! cell centred upwind, central, etc.
 
   type(vector_spec):: vec_properties
 
   type(field_spec):: field_properties
-  class(field), allocatable, target:: u, v, w, p, p_prime, mf, viscosity, density
-  class(field), allocatable, target:: scalar_field
+  class(field), pointer :: u, v, w, p, mf, viscosity, density
+  class(field), pointer :: scalar_field
 
   integer(ccs_int):: n_boundaries
 
@@ -72,6 +74,7 @@ program sandia
   integer(ccs_int):: timer_index_io_init
   integer(ccs_int):: timer_index_io_sol
   integer(ccs_int):: timer_index_sol
+  integer(ccs_int) :: i
 
   logical:: u_sol = .true.  ! Default equations to solve for LDC case
   logical:: v_sol = .true.
@@ -163,34 +166,46 @@ program sandia
   call set_field_enable_cell_corrections(enable_cell_corrections, field_properties)
 
   call set_field_vector_properties(vec_properties, field_properties)
-  call set_field_type(cell_centred_upwind, field_properties)
-  call set_field_name("u", field_properties)
-  call create_field(field_properties, u)
-  call set_field_name("v", field_properties)
-  call create_field(field_properties, v)
-  call set_field_name("w", field_properties)
-  call create_field(field_properties, w)
 
-  call set_field_type(cell_centred_central, field_properties)
-  call set_field_name("p", field_properties)
-  call create_field(field_properties, p)
-  call set_field_name("p_prime", field_properties)
-  call create_field(field_properties, p_prime)
+  ! Expect to find u,v,w,p,p_prime,scalar
+  if (is_root(par_env)) then
+    print *, "Build field list"
+  end if
+
+  do i = 1, size(variable_names)
+    if (is_root(par_env)) then
+      print *, "Creating field ", trim(variable_names(i))
+    end if
+    call set_field_type(variable_types(i), field_properties)
+    call set_field_name(variable_names(i), field_properties)
+    call create_field(field_properties, flow_fields)
+  end do
+
+  if (is_root(par_env)) then
+    print *, "Built ", size(flow_fields%fields), " dynamically-defined fields"
+  end if
+
   call set_field_name("viscosity", field_properties)
-  call create_field(field_properties, viscosity)
+  call create_field(field_properties, flow_fields)
   call set_field_name("density", field_properties)
-  call create_field(field_properties, density)
-
-  call set_field_name("scalar", field_properties)
-  call create_field(field_properties, scalar_field)
+  call create_field(field_properties, flow_fields)
 
   call set_vector_location(face, vec_properties)
   call set_size(par_env, mesh, vec_properties)
   call set_field_vector_properties(vec_properties, field_properties)
   call set_field_type(face_centred, field_properties)
   call set_field_name("mf", field_properties)
-  call create_field(field_properties, mf)
+  call create_field(field_properties, flow_fields)
 
+  call get_field(flow_fields, "u", u)
+  call get_field(flow_fields, "v", v)
+  call get_field(flow_fields, "w", w)
+  call get_field(flow_fields, "w", p)
+  call get_field(flow_fields, "mf", mf)
+  call get_field(flow_fields, "viscosity", viscosity)
+  call get_field(flow_fields, "density", density)
+  call get_field(flow_fields, "scalar", scalar_field)
+  
   ! Add fields to output list
   call add_field_to_outputlist(u)
   call add_field_to_outputlist(v)
@@ -200,7 +215,7 @@ program sandia
 
   ! Initialise velocity field
   if (irank == par_env%root) print *, "Initialise velocity field"
-  call initialise_flow(u, v, w, p, mf, viscosity, density, scalar_field)
+  call initialise_flow(flow_fields)
 
   ! Solve using SIMPLE algorithm
   if (irank == par_env%root) print *, "Start SIMPLE"
@@ -224,15 +239,15 @@ program sandia
   call set_is_field_solved(w_sol, w)
   call set_is_field_solved(p_sol, p)
 
-  call add_field(u, flow_fields)
-  call add_field(v, flow_fields)
-  call add_field(w, flow_fields)
-  call add_field(p, flow_fields)
-  call add_field(p_prime, flow_fields)
-  call add_field(mf, flow_fields)
-  call add_field(viscosity, flow_fields) 
-  call add_field(density, flow_fields)  
-  call add_field(scalar_field, flow_fields)
+  ! Nullify pointers for safety
+  nullify(u)
+  nullify(v)
+  nullify(w)
+  nullify(p)
+  nullify(mf)
+  nullify(viscosity)
+  nullify(density)
+  nullify(scalar_field)
 
   call timer_stop(timer_index_init)
   call timer_register("I/O time for solution", timer_index_io_sol)
@@ -263,11 +278,6 @@ program sandia
   call timer_stop(timer_index_sol)
 
   ! Clean-up
-  deallocate (u)
-  deallocate (v)
-  deallocate (w)
-  deallocate (p)
-  deallocate (p_prime)
 
   call timer_stop(timer_index_total)
 
@@ -296,6 +306,14 @@ contains
     end if
 
     call get_variables(config_file, variable_names)
+    if (size(variable_names) == 0) then
+      call error_abort("No variables were specified.")
+    end if
+    call get_variable_types(config_file, variable_types)
+    if (size(variable_types) /= size(variable_names)) then
+       call error_abort("The number of variable types does not match the number of named variables")
+    end if
+
 
     call get_value(config_file, 'steps', num_steps)
     if (num_steps == huge(0)) then
@@ -358,7 +376,7 @@ contains
 
   end subroutine
 
-  subroutine initialise_flow(u, v, w, p, mf, viscosity, density, scalar_field)
+  subroutine initialise_flow(flow_fields)
 
     use constants, only: insert_mode, ndim
     use types, only: vector_values, cell_locator, face_locator, neighbour_locator
@@ -370,10 +388,11 @@ contains
     use vec, only: get_vector_data, restore_vector_data, create_vector_values
 
     ! Arguments
-    class(field), intent(inout):: u, v, w, p, mf, viscosity, density
-    class(field), intent(inout):: scalar_field
+    type(fluid), intent(inout) :: flow_fields
 
     ! Local variables
+    class(field), pointer :: u, v, w, p, scalar
+    class(field), pointer :: mf, mu, rho
     integer(ccs_int):: n, count
     integer(ccs_int):: n_local
     integer(ccs_int):: index_p, global_index_p, index_f, index_nb
@@ -435,11 +454,29 @@ contains
       call set_entry(scalar_val, scalar_vals)
     end do
 
+    call get_field(flow_fields, "u", u)
+    call get_field(flow_fields, "v", v)
+    call get_field(flow_fields, "w", w)
+    call get_field(flow_fields, "p", p)
+    call get_field(flow_fields, "scalar", scalar)
+
     call set_values(u_vals, u%values)
     call set_values(v_vals, v%values)
     call set_values(w_vals, w%values)
     call set_values(p_vals, p%values)
-    call set_values(scalar_vals, scalar_field%values)
+    call set_values(scalar_vals, scalar%values)
+
+    call update(u%values)
+    call update(v%values)
+    call update(w%values)
+    call update(p%values)
+    call update(scalar%values)
+
+    nullify(u)
+    nullify(v)
+    nullify(w)
+    nullify(p)
+    nullify(scalar)
 
     deallocate (u_vals%global_indices)
     deallocate (v_vals%global_indices)
@@ -452,6 +489,7 @@ contains
     deallocate (p_vals%values)
     deallocate (scalar_vals%values)
 
+    call get_field(flow_fields, "mf", mf)
     call get_vector_data(mf%values, mf_data)
 
     count = 0
@@ -484,24 +522,25 @@ contains
     end do
 
     call restore_vector_data(mf%values, mf_data)
+    call update(mf%values)
+    nullify(mf)
 
-    call get_vector_data(viscosity%values, viscosity_data)
+    call get_field(flow_fields, "viscosity", mu)
+    call get_field(flow_fields, "density", rho)
+    call get_vector_data(mu%values, viscosity_data)
     ! Kinematic viscosity of 1.58e-5_ccs_real
     viscosity_data(:) =  1.92196e-5_ccs_real ! = Dynamic viscosity
-    call restore_vector_data(viscosity%values, viscosity_data)
+    call restore_vector_data(mu%values, viscosity_data)
 
-    call get_vector_data(density%values, density_data)
+    call get_vector_data(rho%values, density_data)
     density_data(:) = 1.21643_ccs_real
-    call restore_vector_data(density%values, density_data)
+    call restore_vector_data(rho%values, density_data)
 
-    call update(u%values)
-    call update(v%values)
-    call update(w%values)
-    call update(p%values)
-    call update(scalar_field%values)
-    call update(mf%values)
-    call update(viscosity%values)
-    call update(density%values)
+    call update(mu%values)
+    call update(rho%values)
+
+    nullify(mu)
+    nullify(rho)
 
   end subroutine initialise_flow
 
