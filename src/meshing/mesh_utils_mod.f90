@@ -197,7 +197,13 @@ contains
       end do
     end if
 
+    ! The most negative value of neighbour indices (i.e. maximum boundary ID) should equal the
+    ! boundary count. Note that in parallel any given process may not have this many boundaries so
+    ! we use a logical OR to check at least one process has a valid boundary ID count.
+    ! We need to also check that no process exceeds the boundary ID count.
     bc_cnt = -minval(mesh%topo%nb_indices)
+
+    ! Check range
     id_names_valid = (bc_cnt == size(mesh%bnd_names))
     select type(par_env)
     type is (parallel_environment_mpi)
@@ -208,7 +214,20 @@ contains
     if (.not. id_names_valid) then
       call error_abort("Maximum boundary ID doesn't match supplied boundary name count!")
     end if
+
+    ! Check no boundary IDs exceed the range
+    id_names_valid = (bc_cnt <= size(mesh%bnd_names))
+    select type(par_env)
+    type is (parallel_environment_mpi)
+      call MPI_Allreduce(MPI_IN_PLACE, id_names_valid, 1, MPI_LOGICAL, MPI_LOR, par_env%comm, ierr)
+    class default
+      call error_abort("Unsupported parallel environment")
+    end select
+    if (.not. id_names_valid) then
+      call error_abort("Maximum boundary ID doesn't match supplied boundary name count!")
+    end if
     call sync(par_env)
+
     if (is_root(par_env)) then
       print *, "Boundary name list / ID compatibility: PASS"
       print *, "=========================="
