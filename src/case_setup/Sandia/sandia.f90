@@ -35,7 +35,7 @@ program sandia
                    allocate_fluid_fields
   use boundary_conditions, only: read_bc_config, allocate_bc_arrays, set_bc_profile
   use read_config, only: get_variables, get_boundary_count, get_boundary_names, get_case_name, &
-                         get_store_residuals, get_enable_cell_corrections get_variable_types
+                         get_store_residuals, get_enable_cell_corrections, get_variable_types
   use timestepping, only: set_timestep, activate_timestepping, initialise_old_values
   use mesh_utils, only: read_mesh, write_mesh
   use partitioning, only: compute_partitioner_input, &
