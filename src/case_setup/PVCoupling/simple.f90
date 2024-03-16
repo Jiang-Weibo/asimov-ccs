@@ -8,7 +8,7 @@ program simple
   use petscvec
   use petscsys
 
-  use ccs_base, only: mesh
+  use ccs_base, only: mesh, bnd_names_default
   use constants, only: cell, face, &
                     ccs_split_type_low_high, ccs_split_undefined
   use kinds, only: ccs_real, ccs_int
@@ -51,7 +51,6 @@ program simple
   logical :: p_sol = .true.  ! Solve p
 
   type(fluid) :: flow_fields
-  character(len=128), dimension(4) :: bnd_names
   
   ! Set start and end iteration numbers (eventually will be read from input file)
   it_start = 1
@@ -70,12 +69,8 @@ program simple
 
   ! Create a square mesh
   print *, "Building mesh"
-  bnd_names(1) = "left"
-  bnd_names(2) = "right"
-  bnd_names(3) = "bottom"
-  bnd_names(4) = "top"
   mesh = build_square_mesh(par_env, shared_env, cps, 1.0_ccs_real, &
-       bnd_names)
+       bnd_names_default(1:4))
   call set_mesh_object(mesh)
 
   ! Initialise fields
