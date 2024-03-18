@@ -227,15 +227,15 @@ contains
     call add_field(viscosity, flow_fields) 
     call add_field(density, flow_fields)
 
-    !call read_solution(par_env, case_path, mesh, output_list)
-    !call get_vector_data(output_list(1)%ptr%values, output_data)
+    call read_solution(par_env, case_path, mesh, output_list)
+    call get_vector_data(output_list(1)%ptr%values, output_data)
 
-    !call get_local_num_cells(n_local)
-    !do index_p = 1, n_local
-      !print*, index_p, output_data(index_p)
-    !end do
+    call get_local_num_cells(n_local)
+    do index_p = 1, n_local
+      print*, index_p, output_data(index_p)
+    end do
   
-    !call restore_vector_data(output_list(1)%ptr%values, output_data)
+    call restore_vector_data(output_list(1)%ptr%values, output_data)
 
     call timer(init_time)
 
