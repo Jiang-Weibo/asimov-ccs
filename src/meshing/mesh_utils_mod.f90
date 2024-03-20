@@ -636,7 +636,7 @@ contains
         call read_array(geo_reader, "/cell/vol", vol_p_start, vol_p_count, temp_vol_c)
       end if
       call sync(shared_env)
-      mesh%geo%volumes(total_offset:total_offset + total_num_cells) = temp_vol_c(mesh%topo%natural_indices(:))
+      mesh%geo%volumes(total_offset+1:total_offset + total_num_cells) = temp_vol_c(mesh%topo%natural_indices(:))
       call sync(shared_env)
       call destroy_shared_array(shared_env, temp_vol_c, temp_window)
 
@@ -657,7 +657,7 @@ contains
         call read_array(geo_reader, "/cell/x", x_p_start, x_p_count, temp_x_p)
       end if
       call sync(shared_env)
-      mesh%geo%x_p(:, total_offset:total_offset + total_num_cells) = temp_x_p(:, mesh%topo%natural_indices(:))
+      mesh%geo%x_p(:, total_offset+1:total_offset + total_num_cells) = temp_x_p(:, mesh%topo%natural_indices(:))
       call sync(shared_env)
       call destroy_shared_array(shared_env, temp_x_p, temp_window)
 
