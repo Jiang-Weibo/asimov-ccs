@@ -3282,9 +3282,12 @@ contains
     end do
   end subroutine set_naive_distribution
 
+  !v Sets the offsets used for indexing into shared arrays for data that belongs to each rank. 
+  !  The halo cells may be interleaved with the local cells for some data so we need to store offsets 
+  !  for both types of arrays.
   subroutine set_offsets(shared_env, mesh)
-    class(parallel_environment), intent(in) :: shared_env
-    type(ccs_mesh), intent(inout) :: mesh
+    class(parallel_environment), intent(in) :: shared_env   !< The shared environment
+    type(ccs_mesh), intent(inout) :: mesh                   !< The mesh
 
     integer(ccs_int), dimension(:), pointer :: shared_array_local_offsets   !< Offset within shared arrays for quantities that are locally indexed (i.e. each rank is responsible for local_num_cells of these)
     integer(ccs_int), dimension(:), pointer :: shared_array_total_offsets   !< Offset within shared arrays for quantities that are totally indexed (i.e. each rank is responsible for total_num_cells of these)

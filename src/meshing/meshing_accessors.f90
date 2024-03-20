@@ -429,7 +429,7 @@ contains
 
     associate (cell => loc_f%index_p, &
                face => loc_f%cell_face_ctr, &
-               offset => mesh%topo%shared_array_local_offset)
+               offset => mesh%topo%shared_array_local_offset)   ! Face normal arrays consist of only local cells, hence specify local offset
       normal(:) = mesh%geo%face_normals(:, face, cell+offset)
     end associate
   end subroutine get_face_normal
@@ -441,7 +441,7 @@ contains
 
     associate (cell => loc_f%index_p, &
                face => loc_f%cell_face_ctr, &
-               offset => mesh%topo%shared_array_local_offset)
+               offset => mesh%topo%shared_array_local_offset)   ! Face area arrays consist of only local cells, hence specify local offset
       area = mesh%geo%face_areas(face, cell+offset)
     end associate
   end subroutine get_face_area
@@ -453,7 +453,7 @@ contains
 
     associate (cell => loc_f%index_p, &
                face => loc_f%cell_face_ctr, &
-               offset => mesh%topo%shared_array_local_offset)
+               offset => mesh%topo%shared_array_local_offset)   ! Face area arrays consist of only local cells, hence specify local offset
       mesh%geo%face_areas(face, cell+offset) = area
     end associate
   end subroutine set_area
@@ -465,7 +465,7 @@ contains
 
     integer :: dim
 
-    associate (cell => loc_p%index_p, offset => mesh%topo%shared_array_total_offset)
+    associate (cell => loc_p%index_p, offset => mesh%topo%shared_array_total_offset)  ! Cell centre arrays interleave halo cells with local cells, hence specify total offset
       do dim = 1, min(size(x), ndim)
         x(dim) = mesh%geo%x_p(dim, cell+offset)
       end do
@@ -490,7 +490,7 @@ contains
 
     associate (cell => loc_f%index_p, &
                face => loc_f%cell_face_ctr, &
-               offset => mesh%topo%shared_array_local_offset)
+               offset => mesh%topo%shared_array_local_offset)   ! Face centre arrays consist of only local cells, hence specify local offset
       x(:) = mesh%geo%x_f(:, face, cell+offset)
     end associate
   end subroutine get_face_centre
@@ -504,7 +504,7 @@ contains
 
     associate (cell => loc_v%index_p, &
                vert => loc_v%cell_vert_ctr, &
-               offset => mesh%topo%shared_array_local_offset)
+               offset => mesh%topo%shared_array_local_offset)   ! Vertex centre arrays consist of only local cells, hence specify local offset
       do dim = 1, min(size(x), ndim)
         x(dim) = mesh%geo%vert_coords(dim, vert, cell+offset)
       end do
@@ -517,7 +517,7 @@ contains
     real(ccs_real), intent(out) :: V        !< the cell volume.
 
     associate (cell => loc_p%index_p, &
-               offset => mesh%topo%shared_array_total_offset)
+               offset => mesh%topo%shared_array_total_offset)   ! Volume arrays interleave halo cells with local cells, hence specify total offset
       V = mesh%geo%volumes(cell+offset)
     end associate
   end subroutine get_cell_volume
@@ -804,7 +804,7 @@ contains
 
     integer :: dim
 
-    associate (i => loc_p%index_p, offset => mesh%topo%shared_array_total_offset)
+    associate (i => loc_p%index_p, offset => mesh%topo%shared_array_total_offset)   ! Cell centre arrays interleave halo cells with local cells, hence specify total offset
       do dim = 1, min(size(x_p), ndim)
         mesh%geo%x_p(dim, i+offset) = x_p(dim)
       end do
@@ -820,7 +820,7 @@ contains
 
     associate (i => loc_f%index_p, &
                j => loc_f%cell_face_ctr, &
-               offset => mesh%topo%shared_array_local_offset)
+               offset => mesh%topo%shared_array_local_offset)   ! Face centre arrays consist of only local cells, hence specify local offset
       do dim = 1, min(size(x_f), ndim)
         mesh%geo%x_f(dim, j, i+offset) = x_f(dim)
       end do
@@ -836,7 +836,7 @@ contains
 
     associate (i => loc_v%index_p, &
                j => loc_v%cell_vert_ctr, &
-               offset => mesh%topo%shared_array_local_offset)
+               offset => mesh%topo%shared_array_local_offset)   ! Vertex centre arrays consist of only local cells, hence specify local offset
       do dim = 1, min(size(x_v), ndim)
         mesh%geo%vert_coords(dim, j, i+offset) = x_v(dim)
       end do
@@ -856,7 +856,7 @@ contains
     invmag = 1.0_ccs_real / sqrt(sum(normal**2))
     associate (cell => loc_f%index_p, &
                face => loc_f%cell_face_ctr, &
-               offset => mesh%topo%shared_array_local_offset)
+               offset => mesh%topo%shared_array_local_offset)   ! Face normal arrays consist of only local cells, hence specify local offset
       do dim = 1, min(size(normal), ndim)
         mesh%geo%face_normals(dim, face, cell+offset) = normal(dim) * invmag
       end do
