@@ -207,7 +207,7 @@ contains
     call nullify_mesh_object()
 
     call read_topology_topo(par_env, shared_env, reader_env, geo_reader, mesh%topo)
-    !call build_vertex_neighbours(par_env, shared_env, mesh)
+    call build_vertex_neighbours(par_env, shared_env, mesh)
 
   end subroutine read_topology
 
@@ -629,7 +629,6 @@ contains
                total_offset => mesh%topo%shared_array_total_offset)
       ! Allocate shared memory array for cell volumes 
       call create_shared_array(shared_env, sum_total_num_cells, mesh%geo%volumes, mesh%geo%volumes_window)
-      !allocate (mesh%geo%volumes(total_num_cells))
 
       ! Read variable "/cell/vol"
       call create_shared_array(shared_env, global_num_cells, temp_vol_c, &
@@ -640,7 +639,6 @@ contains
       call sync(shared_env)
       mesh%geo%volumes(total_offset+1:total_offset + total_num_cells) = temp_vol_c(mesh%topo%natural_indices(:))
       call sync(shared_env)
-      call dprint("temp_vol_c " // str(temp_vol_c(mesh%topo%natural_indices(1))) // " volumes " // str(mesh%geo%volumes(total_offset+1)))
       call destroy_shared_array(shared_env, temp_vol_c, temp_window)
 
       ! Starting point for reading chunk of data
@@ -651,7 +649,6 @@ contains
 
       ! Allocate shared memory array for cell centre coordinates 
       call create_shared_array(shared_env, [ndim, sum_total_num_cells], mesh%geo%x_p, mesh%geo%x_p_window)
-      !allocate (mesh%geo%x_p(ndim, total_num_cells))
 
       ! Read variable "/cell/x"
       call create_shared_array(shared_env, [ndim, global_num_cells], temp_x_p, &
@@ -710,10 +707,6 @@ contains
       call create_shared_array(shared_env, [ndim, all_max_faces, sum_local_num_cells], mesh%geo%face_normals, mesh%geo%face_normals_window) 
       call create_shared_array(shared_env, [all_max_faces, sum_local_num_cells], mesh%geo%face_areas, mesh%geo%face_areas_window)
       call create_shared_array(shared_env, [ndim, vert_per_cell, sum_local_num_cells], mesh%geo%vert_coords, mesh%geo%vert_coords_window)
-      !allocate (mesh%geo%x_f(ndim, max_faces, local_num_cells))
-      !allocate (mesh%geo%face_normals(ndim, max_faces, local_num_cells))
-      !allocate (mesh%geo%face_areas(max_faces, local_num_cells))
-      !allocate (mesh%geo%vert_coords(ndim, vert_per_cell, local_num_cells))
 
       ! Procs fill local data
       call sync(shared_env)
