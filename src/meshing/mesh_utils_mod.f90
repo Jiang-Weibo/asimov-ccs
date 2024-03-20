@@ -156,6 +156,8 @@ contains
 
     call mesh_partition_reorder(par_env, shared_env, mesh)
 
+    call set_offsets(shared_env, mesh)
+
     call timer_start(timer_read_geo)
     call read_geometry(shared_env, reader_env, geo_reader, mesh)
     call timer_stop(timer_read_geo)
@@ -205,7 +207,7 @@ contains
     call nullify_mesh_object()
 
     call read_topology_topo(par_env, shared_env, reader_env, geo_reader, mesh%topo)
-    call build_vertex_neighbours(par_env, shared_env, mesh)
+    !call build_vertex_neighbours(par_env, shared_env, mesh)
 
   end subroutine read_topology
 
@@ -638,6 +640,7 @@ contains
       call sync(shared_env)
       mesh%geo%volumes(total_offset+1:total_offset + total_num_cells) = temp_vol_c(mesh%topo%natural_indices(:))
       call sync(shared_env)
+      call dprint("temp_vol_c " // str(temp_vol_c(mesh%topo%natural_indices(1))) // " volumes " // str(mesh%geo%volumes(total_offset+1)))
       call destroy_shared_array(shared_env, temp_vol_c, temp_window)
 
       ! Starting point for reading chunk of data
