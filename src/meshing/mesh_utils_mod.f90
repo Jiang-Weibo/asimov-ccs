@@ -568,7 +568,10 @@ contains
     integer(ccs_int) :: global_num_cells
     integer(ccs_int) :: global_num_faces
     integer(ccs_int) :: global_num_vertices
+    integer(ccs_int) :: sum_local_num_cells
+    integer(ccs_int) :: sum_total_num_cells
     integer(ccs_int) :: max_faces
+    integer(ccs_int) :: all_max_faces
     type(face_locator) :: loc_f ! Face locator object
     type(vert_locator) :: loc_v ! Vertex locator object
 
@@ -576,6 +579,7 @@ contains
     integer :: shared_comm
 
     integer :: temp_a_f_window, temp_n_f_window, temp_window, temp_x_f_window, temp_x_v_window
+
 
     call set_mesh_object(mesh)
     select type (shared_env)
@@ -593,6 +597,17 @@ contains
       call error_abort("Currently only supporting hex cells.")
     end if
 
+    call get_local_num_cells(local_num_cells)
+    call get_total_num_cells(total_num_cells)
+    select type (shared_env)
+    type is (parallel_environment_mpi)
+      call mpi_allreduce(local_num_cells, sum_local_num_cells, 1, MPI_INTEGER, MPI_SUM, shared_env%comm, ierr)
+      call mpi_allreduce(total_num_cells, sum_total_num_cells, 1, MPI_INTEGER, MPI_SUM, shared_env%comm, ierr)
+      call mpi_allreduce(max_faces, all_max_faces, 1, MPI_INTEGER, MPI_MAX, shared_env%comm, ierr)
+    class default
+      call error_abort("invalid parallel environment")
+    end select
+
     call get_vert_per_cell(vert_per_cell)
 
     ! Read attribute "scalefactor"
@@ -608,140 +623,147 @@ contains
     call get_global_num_cells(global_num_cells)
     vol_p_count = global_num_cells
 
-    ! Allocate memory for cell volumes array on each MPI rank
-    call get_total_num_cells(total_num_cells)
-    allocate (mesh%geo%volumes(total_num_cells))
+    associate (local_offset => mesh%topo%shared_array_local_offset, &
+               total_offset => mesh%topo%shared_array_total_offset)
+      ! Allocate shared memory array for cell volumes 
+      call create_shared_array(shared_env, sum_total_num_cells, mesh%geo%volumes, mesh%geo%volumes_window)
+      !allocate (mesh%geo%volumes(total_num_cells))
 
-    ! Read variable "/cell/vol"
-    call create_shared_array(shared_env, global_num_cells, temp_vol_c, &
-                             temp_window)
-    if (is_valid(reader_env)) then
-      call read_array(geo_reader, "/cell/vol", vol_p_start, vol_p_count, temp_vol_c)
-    end if
-    call sync(shared_env)
-    mesh%geo%volumes(:) = temp_vol_c(mesh%topo%natural_indices(:))
-    call sync(shared_env)
-    call destroy_shared_array(shared_env, temp_vol_c, temp_window)
+      ! Read variable "/cell/vol"
+      call create_shared_array(shared_env, global_num_cells, temp_vol_c, &
+                               temp_window)
+      if (is_valid(reader_env)) then
+        call read_array(geo_reader, "/cell/vol", vol_p_start, vol_p_count, temp_vol_c)
+      end if
+      call sync(shared_env)
+      mesh%geo%volumes(total_offset:total_offset + total_num_cells) = temp_vol_c(mesh%topo%natural_indices(:))
+      call sync(shared_env)
+      call destroy_shared_array(shared_env, temp_vol_c, temp_window)
 
-    ! Starting point for reading chunk of data
-    x_p_start = [0, 0]
+      ! Starting point for reading chunk of data
+      x_p_start = [0, 0]
 
-    ! How many data points will be read?
-    x_p_count = [ndim, global_num_cells]
+      ! How many data points will be read?
+      x_p_count = [ndim, global_num_cells]
 
-    ! Allocate memory for cell centre coordinates array on each MPI rank
-    allocate (mesh%geo%x_p(ndim, total_num_cells))
+      ! Allocate shared memory array for cell centre coordinates 
+      call create_shared_array(shared_env, [ndim, sum_total_num_cells], mesh%geo%x_p, mesh%geo%x_p_window)
+      !allocate (mesh%geo%x_p(ndim, total_num_cells))
 
-    ! Read variable "/cell/x"
-    call create_shared_array(shared_env, [ndim, global_num_cells], temp_x_p, &
-                             temp_window)
-    if (is_valid(reader_env)) then
-      call read_array(geo_reader, "/cell/x", x_p_start, x_p_count, temp_x_p)
-    end if
-    call sync(shared_env)
-    mesh%geo%x_p(:, :) = temp_x_p(:, mesh%topo%natural_indices(:))
-    call sync(shared_env)
-    call destroy_shared_array(shared_env, temp_x_p, temp_window)
+      ! Read variable "/cell/x"
+      call create_shared_array(shared_env, [ndim, global_num_cells], temp_x_p, &
+                               temp_window)
+      if (is_valid(reader_env)) then
+        call read_array(geo_reader, "/cell/x", x_p_start, x_p_count, temp_x_p)
+      end if
+      call sync(shared_env)
+      mesh%geo%x_p(:, total_offset:total_offset + total_num_cells) = temp_x_p(:, mesh%topo%natural_indices(:))
+      call sync(shared_env)
+      call destroy_shared_array(shared_env, temp_x_p, temp_window)
 
-    ! Allocate temporary arrays for face centres, face normals, face areas and vertex coords
-    call get_global_num_faces(global_num_faces)
+      ! Allocate temporary arrays for face centres, face normals, face areas and vertex coords
+      call get_global_num_faces(global_num_faces)
 
-    call create_shared_array(shared_env, [ndim, global_num_faces], temp_x_f, &
-                             temp_x_f_window)
-    call create_shared_array(shared_env, [ndim, global_num_faces], temp_n_f, &
-                             temp_n_f_window)
-    call create_shared_array(shared_env, global_num_faces, temp_a_f, &
-                             temp_a_f_window)
+      call create_shared_array(shared_env, [ndim, global_num_faces], temp_x_f, &
+                               temp_x_f_window)
+      call create_shared_array(shared_env, [ndim, global_num_faces], temp_n_f, &
+                               temp_n_f_window)
+      call create_shared_array(shared_env, global_num_faces, temp_a_f, &
+                               temp_a_f_window)
 
-    f_xn_start = 0
-    f_xn_count(1) = ndim
-    f_xn_count(2) = global_num_faces
+      f_xn_start = 0
+      f_xn_count(1) = ndim
+      f_xn_count(2) = global_num_faces
 
-    if (is_valid(reader_env)) then
-      ! Read variable "/face/x"
-      call read_array(geo_reader, "/face/x", f_xn_start, f_xn_count, temp_x_f)
-      ! Read variable "/face/n"
-      call read_array(geo_reader, "/face/n", f_xn_start, f_xn_count, temp_n_f)
-    end if
+      if (is_valid(reader_env)) then
+        ! Read variable "/face/x"
+        call read_array(geo_reader, "/face/x", f_xn_start, f_xn_count, temp_x_f)
+        ! Read variable "/face/n"
+        call read_array(geo_reader, "/face/n", f_xn_start, f_xn_count, temp_n_f)
+      end if
 
-    f_a_start = 0
-    f_a_count(1) = global_num_faces
+      f_a_start = 0
+      f_a_count(1) = global_num_faces
 
-    if (is_valid(reader_env)) then
-      ! Read variable "/face/area"
-      call read_array(geo_reader, "/face/area", f_a_start, f_a_count, temp_a_f)
-    end if
-    call sync(shared_env)
+      if (is_valid(reader_env)) then
+        ! Read variable "/face/area"
+        call read_array(geo_reader, "/face/area", f_a_start, f_a_count, temp_a_f)
+      end if
+      call sync(shared_env)
 
-    ! Read variable "/vert"
-    call get_global_num_vertices(global_num_vertices)
-    call create_shared_array(shared_env, [ndim, global_num_vertices], temp_x_v, &
-                             temp_x_v_window)
-    f_xn_count(1) = ndim
-    f_xn_count(2) = global_num_vertices
-    if (is_valid(reader_env)) then
-      call read_array(geo_reader, "/vert", f_xn_start, f_xn_count, temp_x_v)
-    end if
-    call sync(shared_env)
+      ! Read variable "/vert"
+      call get_global_num_vertices(global_num_vertices)
+      call create_shared_array(shared_env, [ndim, global_num_vertices], temp_x_v, &
+                               temp_x_v_window)
+      f_xn_count(1) = ndim
+      f_xn_count(2) = global_num_vertices
+      if (is_valid(reader_env)) then
+        call read_array(geo_reader, "/vert", f_xn_start, f_xn_count, temp_x_v)
+      end if
+      call sync(shared_env)
 
-    ! Allocate arrays for face centres, face normals, face areas arrand vertex coordinates
-    call get_local_num_cells(local_num_cells)
-    allocate (mesh%geo%x_f(ndim, max_faces, local_num_cells))
-    allocate (mesh%geo%face_normals(ndim, max_faces, local_num_cells))
-    allocate (mesh%geo%face_areas(max_faces, local_num_cells))
-    allocate (mesh%geo%vert_coords(ndim, vert_per_cell, local_num_cells))
+      ! Allocate shared memory arrays for face centres, face normals, face areas and vertex coordinates
+      call create_shared_array(shared_env, [ndim, all_max_faces, sum_local_num_cells], mesh%geo%x_f, mesh%geo%x_f_window) 
+      call create_shared_array(shared_env, [ndim, all_max_faces, sum_local_num_cells], mesh%geo%face_normals, mesh%geo%face_normals_window) 
+      call create_shared_array(shared_env, [all_max_faces, sum_local_num_cells], mesh%geo%face_areas, mesh%geo%face_areas_window)
+      call create_shared_array(shared_env, [ndim, vert_per_cell, sum_local_num_cells], mesh%geo%vert_coords, mesh%geo%vert_coords_window)
+      !allocate (mesh%geo%x_f(ndim, max_faces, local_num_cells))
+      !allocate (mesh%geo%face_normals(ndim, max_faces, local_num_cells))
+      !allocate (mesh%geo%face_areas(max_faces, local_num_cells))
+      !allocate (mesh%geo%vert_coords(ndim, vert_per_cell, local_num_cells))
 
-    ! Procs fill local data
-    call sync(shared_env)
-    do local_icell = 1, local_num_cells ! loop over cells owned by current process
-      call create_cell_locator(local_icell, loc_p)
-      call get_natural_index(loc_p, global_icell)
+      ! Procs fill local data
+      call sync(shared_env)
+      do local_icell = 1, local_num_cells ! loop over cells owned by current process
+        call create_cell_locator(local_icell, loc_p)
+        call get_natural_index(loc_p, global_icell)
 
-      do j = 1, max_faces ! loop over all faces for each cell
-        call create_face_locator(local_icell, j, loc_f)
+        do j = 1, max_faces ! loop over all faces for each cell
+          call create_face_locator(local_icell, j, loc_f)
 
-        n = mesh%topo%global_face_indices(j, global_icell)
-        call set_centre(loc_f, temp_x_f(:, n))
-        do i = 1, ndim ! loop over dimensions
-          ! Map from temp array to mesh for face centres and face normals
-          mesh%geo%face_normals(i, j, local_icell) = temp_n_f(i, n)
+          n = mesh%topo%global_face_indices(j, global_icell)
+          call set_centre(loc_f, temp_x_f(:, n))
+          do i = 1, ndim ! loop over dimensions
+            ! Map from temp array to mesh for face centres and face normals
+            mesh%geo%face_normals(i, j, local_icell + local_offset) = temp_n_f(i, n)
+          end do
+
+          ! Map from temp array to mesh for face areas
+          call set_area(temp_a_f(n), loc_f)
         end do
 
-        ! Map from temp array to mesh for face areas
-        call set_area(temp_a_f(n), loc_f)
-      end do
+        do j = 1, vert_per_cell ! loop over all vertices for each cell
+          call create_vert_locator(local_icell, j, loc_v)
 
-      do j = 1, vert_per_cell ! loop over all vertices for each cell
-        call create_vert_locator(local_icell, j, loc_v)
-
-        n = mesh%topo%loc_global_vertex_indices(j, local_icell)
-        call set_centre(loc_v, temp_x_v(:, n))
-      end do
-
-    end do
-
-    ! Correct normal orientations and norms
-    do index_p = 1, local_num_cells ! loop over cells owned by current process
-
-      call create_cell_locator(index_p, loc_p)
-      call get_centre(loc_p, x_p)
-      call count_neighbours(loc_p, nnb)
-
-      do j = 1, nnb ! loop over all faces for each cell
-
-        call create_face_locator(index_p, j, loc_f)
-        call get_face_normal(loc_f, face_normal)
-        call get_centre(loc_f, x_f)
-
-        if (dot_product(face_normal(:), x_f - x_p) < 0.0_ccs_real) then
-          face_normal = -face_normal
-        end if
-
-        ! Normalise face normals too
-        call set_normal(loc_f, face_normal / norm2(face_normal))
+          n = mesh%topo%loc_global_vertex_indices(j, local_icell)
+          call set_centre(loc_v, temp_x_v(:, n))
+        end do
 
       end do
-    end do
+
+      ! Correct normal orientations and norms
+      do index_p = 1, local_num_cells ! loop over cells owned by current process
+
+        call create_cell_locator(index_p, loc_p)
+        call get_centre(loc_p, x_p)
+        call count_neighbours(loc_p, nnb)
+
+        do j = 1, nnb ! loop over all faces for each cell
+
+          call create_face_locator(index_p, j, loc_f)
+          call get_face_normal(loc_f, face_normal)
+          call get_centre(loc_f, x_f)
+
+          if (dot_product(face_normal(:), x_f - x_p) < 0.0_ccs_real) then
+            face_normal = -face_normal
+          end if
+
+          ! Normalise face normals too
+          call set_normal(loc_f, face_normal / norm2(face_normal))
+
+        end do
+      end do
+    end associate
 
     ! Delete temp arrays
     call sync(shared_env)
