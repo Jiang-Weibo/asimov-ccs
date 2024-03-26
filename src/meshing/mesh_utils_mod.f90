@@ -98,6 +98,7 @@ module mesh_utils
   public :: partition_stride
   public :: print_topo
   public :: print_geo
+  public :: build_adjacency_matrix
 
 contains
 
@@ -287,8 +288,10 @@ contains
     call get_max_faces(max_faces)
     if (max_faces == 6) then ! if cell are hexes
       call set_vert_per_cell(8) ! 8 vertices per cell
+    else if (max_faces == 4) then ! if cell are tetrahedral
+      call set_vert_per_cell(4) ! 4 vertices per cell
     else
-      call error_abort("Currently only supporting hex cells.")
+      call error_abort("Currently only supporting hex or tet cells.")
     end if
 
     call get_global_num_faces(global_num_faces)
@@ -461,6 +464,8 @@ contains
     call get_max_faces(max_faces)
     if (max_faces == 6) then ! if cell are hexes
       call set_vert_per_cell(8) ! 8 vertices per cell
+    else if (max_faces == 4) then ! if cell are tetrahedral
+      call set_vert_per_cell(4) ! 4 vertices per cell
     else
       call error_abort("Currently only supporting hex cells.")
     end if
@@ -655,13 +660,19 @@ contains
     class(io_process), allocatable :: geo_writer
 
     logical :: is_generated
-
+    
     call get_mesh_generated(is_generated)
 
     if (.not. is_generated) then
       ! Mesh was read, no need to write again
       return
     end if
+
+    ! XXX: Return early to prevent memory issues with write_mesh
+    if (is_root(par_env)) then
+      print *, "WARNING: write mesh is disabled, if you want mesh output edit the subroutine by removing the early return."
+    end if
+    return
 
     ! Set ADIOS2 config file name
     adios2_file = case_name // adiosconfig
@@ -2985,6 +2996,45 @@ contains
       j = j + k
     end do
   end subroutine set_naive_distribution
+
+  ! Build adjacency matrix for local cells
+  pure subroutine build_adjacency_matrix(xadj, adjncy)
+
+    integer(ccs_int), allocatable, dimension(:), intent(out) :: xadj   !< Array that points to where in adjncy 
+                                                                       !  the list for each cell begins and ends
+    integer(ccs_int), allocatable, dimension(:), intent(out) :: adjncy !< Array storing adjacency lists for each cell consecutively
+    
+    integer(ccs_int) :: local_num_cells
+    integer(ccs_int) :: ctr
+    integer(ccs_int) :: idx
+    integer(ccs_int) :: i, j, nnb
+    type(cell_locator) :: loc_p
+    type(neighbour_locator) :: loc_nb
+    logical :: cell_local
+
+
+    allocate (xadj(0))
+    allocate (adjncy(0))
+    ctr = 1
+    xadj = [xadj, ctr]
+    
+    call get_local_num_cells(local_num_cells)
+    do i = 1, local_num_cells
+      call create_cell_locator(i, loc_p)
+      call count_neighbours(loc_p, nnb)
+      do j = 1, nnb
+        call create_neighbour_locator(loc_p, j, loc_nb)
+        call get_local_status(loc_nb, cell_local)
+        if (cell_local) then
+          call get_local_index(loc_nb, idx)
+          adjncy = [adjncy, idx]
+          ctr = ctr + 1
+        end if
+      end do
+      xadj = [xadj, ctr]
+    end do
+
+  end subroutine build_adjacency_matrix
 
   !v Sets the offsets used for indexing into shared arrays for data that belongs to each rank. 
   !  The halo cells may be interleaved with the local cells for some data so we need to store offsets 
