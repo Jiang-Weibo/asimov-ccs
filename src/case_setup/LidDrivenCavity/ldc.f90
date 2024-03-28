@@ -206,7 +206,6 @@ program ldc
   nullify(density)
 
   call read_solution(par_env, case_path, mesh, flow_fields)
-  !call get_vector_data(flow_fields%fields%ptr%values, output_data)
   call get_field(flow_fields, "u", u) 
   call get_vector_data(u%values, output_data)
   
