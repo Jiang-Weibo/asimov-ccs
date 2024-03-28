@@ -8,9 +8,10 @@ submodule(io_visualisation) io_visualisation_adios2
                 write_array, read_array
   use adios2
   use adios2_types, only: adios2_io_process
-  use utils, only: exit_print
+  use utils, only: exit_print, get_field, update, set_values
   use timers, only: timer_register, timer_start, timer_stop
-
+  use types, only: field
+  
   implicit none
 
   logical, save :: initial_step = .true.
@@ -24,7 +25,7 @@ contains
   end subroutine
 
   !> Read the field data to file
-  module subroutine read_fields(par_env, case_name, mesh, output_list, step, maxstep)
+  module subroutine read_fields(par_env, case_name, mesh, flow, step, maxstep)
 
     use kinds, only: ccs_long
     use constants, only: ndim, adiosconfig
@@ -38,7 +39,7 @@ contains
     class(parallel_environment), allocatable, target, intent(in) :: par_env  !< The parallel environment
     character(len=:), allocatable, intent(in) :: case_name                   !< The case name
     type(ccs_mesh), intent(in) :: mesh                                       !< The mesh
-    type(field_ptr), dimension(:), intent(inout) :: output_list              !< List of fields to output
+    type(fluid), intent(inout) :: flow                                       !< The flow variables
     integer(ccs_int), optional, intent(in) :: step                           !< The current time-step count
     integer(ccs_int), optional, intent(in) :: maxstep                        !< The maximum time-step count
 
@@ -59,7 +60,7 @@ contains
     integer(ccs_long), dimension(2) :: sel2_start
     integer(ccs_long), dimension(2) :: sel2_count
 
-    real(ccs_real), dimension(:), allocatable :: data
+    real(ccs_real), dimension(:), allocatable, target :: data
 
     integer(ccs_int) :: timer_index_nat_data_output
     integer(ccs_int) :: timer_index_nat_data
@@ -75,6 +76,7 @@ contains
 
     real(ccs_long), dimension(:), pointer :: output_data
     integer(ccs_int) :: index_p
+    class(field), pointer :: phi
 
     sol_file = case_name // '.sol.h5'
     print*,"sol_file=",sol_file
@@ -128,27 +130,37 @@ contains
 
      ! Loop over output list and write out
     call timer_start(timer_index_output)
-    do i = 1, size(output_list)
-      ! Check whether pointer is associated with a field
-      if (.not. associated(output_list(i)%ptr)) exit
+    do i = 1, size(flow%fields)
+      call get_field(flow, i, phi)
+      if (phi%output) then
+        call timer_start(timer_index_nat_data_output)
+        call get_natural_data(par_env, mesh, phi%values, data)
+        call timer_stop(timer_index_nat_data_output)
+        data_name = "/" // trim(phi%name)
 
-      call timer_start(timer_index_nat_data_output)
-      call get_natural_data(par_env, mesh, output_list(i)%ptr%values, data)
-      call timer_stop(timer_index_nat_data_output)
-      data_name = "/" // trim(output_list(i)%name)
-      print*, "data_name=",data_name," sel_start=",sel_start," sel_count=",sel_count
+        print*, "data_name=",data_name," sel_start=",sel_start," sel_count=",sel_count
 
-      call read_array(sol_reader, trim(data_name), sel_start, sel_count, data, steps)
+        call read_array(sol_reader, data_name, sel_start, sel_count, data, steps)
 
-      call get_vector_data(output_list(i)%ptr%values, output_data)
-      output_data = data
+        call get_vector_data(phi%values, output_data)
+        output_data = data
 
-      !do index_p = 1, n_local
-      !do index_p = 1, 9
-        !print*, index_p, output_data(index_p)
-      !end do
+        !call get_vector_data(output_list(i)%ptr%values, output_data)
+        !output_data = data
 
-      call restore_vector_data(output_list(i)%ptr%values, output_data)
+        !do index_p = 1, n_local
+        do index_p = 1, 9
+          print*, index_p, data(index_p)
+        end do
+
+
+        !call restore_vector_data(output_list(i)%ptr%values, output_data)
+        !call set_values(data, phi%values)
+        call restore_vector_data(phi%values, output_data)
+        call update(phi%values)
+        
+      end if 
+      nullify(phi)
     end do
 
     call timer_stop(timer_index_output)
@@ -176,7 +188,7 @@ contains
 
 
   !> Write the field data to file
-  module subroutine write_fields(par_env, case_name, mesh, output_list, step, maxstep)
+  module subroutine write_fields(par_env, case_name, mesh, flow, step, maxstep)
 
     use kinds, only: ccs_long
     use constants, only: ndim, adiosconfig
@@ -193,7 +205,7 @@ contains
     class(parallel_environment), allocatable, target, intent(in) :: par_env  !< The parallel environment
     character(len=:), allocatable, intent(in) :: case_name                   !< The case name
     type(ccs_mesh), intent(in) :: mesh                                       !< The mesh
-    type(field_ptr), dimension(:), intent(inout) :: output_list              !< List of fields to output
+    type(fluid), intent(inout) :: flow                                       !< The flow variables
     integer(ccs_int), optional, intent(in) :: step                           !< The current time-step count
     integer(ccs_int), optional, intent(in) :: maxstep                        !< The maximum time-step count
 
@@ -229,7 +241,8 @@ contains
 
     real(ccs_real), dimension(:), pointer :: output_data
     integer(ccs_int) :: index_p
-
+    class(field), pointer :: phi
+    
     sol_file = case_name // '.sol.h5'
     print*,"sol_file=",sol_file
     adios2_file = case_name // adiosconfig
@@ -281,34 +294,25 @@ contains
 
     ! Loop over output list and write out
     call timer_start(timer_index_output)
-    do i = 1, size(output_list)
-      ! Check whether pointer is associated with a field
-      if (.not. associated(output_list(i)%ptr)) exit
-
-      call timer_start(timer_index_nat_data_output)
-      call get_natural_data(par_env, mesh, output_list(i)%ptr%values, data)
-      call timer_stop(timer_index_nat_data_output)
-      data_name = "/" // trim(output_list(i)%name)
-      call write_array(sol_writer, data_name, sel_shape, sel_start, sel_count, data)
-      print*,data_name
-      call get_vector_data(output_list(i)%ptr%values, output_data)
-      !do index_p = 1, n_local
-      do index_p = 1, 9
-        print*, index_p, output_data(index_p)
-      end do
-
-      ! Store residuals if available
-      if (allocated(output_list(i)%ptr%residuals)) then
-        call timer_start(timer_index_nat_data_output)
-        call get_natural_data(par_env, mesh, output_list(i)%ptr%residuals, data)
-        call timer_stop(timer_index_nat_data_output)
-        data_name = "/" // trim(output_list(i)%name // "_res")
-        call write_array(sol_writer, data_name, sel_shape, sel_start, sel_count, data)
-      end if
+    do i = 1, size(flow%fields)
+      call get_field(flow, i, phi)
+      if (phi%output) then
       
-    end do
-    do i = 1, size(output_list)
-      call restore_vector_data(output_list(i)%ptr%values, output_data)
+        call timer_start(timer_index_nat_data_output)
+        call get_natural_data(par_env, mesh, phi%values, data)
+        call timer_stop(timer_index_nat_data_output)
+        data_name = "/" // trim(phi%name)
+        call write_array(sol_writer, data_name, sel_shape, sel_start, sel_count, data)
+
+        ! Store residuals if available
+        if (allocated(phi%residuals)) then
+          call timer_start(timer_index_nat_data_output)
+          call get_natural_data(par_env, mesh, phi%residuals, data)
+          call timer_stop(timer_index_nat_data_output)
+          data_name = "/" // trim(phi%name // "_res")
+          call write_array(sol_writer, data_name, sel_shape, sel_start, sel_count, data)
+        end if
+      end if
     end do
     call timer_stop(timer_index_output)
    
@@ -316,30 +320,31 @@ contains
     ! Write out gradients, if required (e.g. for calculating enstrophy)
     if (write_gradients) then
       call timer_start(timer_index_grad)
-      do i = 1, size(output_list)
-        ! Check whether pointer is associated with a field
-        if (.not. associated(output_list(i)%ptr)) exit
+      do i = 1, size(flow%fields)
+        call get_field(flow, i, phi)
 
-        ! x-gradient
-        call timer_start(timer_index_nat_data)
-        call get_natural_data(par_env, mesh, output_list(i)%ptr%x_gradients, data)
-        call timer_stop(timer_index_nat_data)
-        data_name = "/d" // trim(output_list(i)%name) // "dx"
-        call write_array(sol_writer, data_name, sel_shape, sel_start, sel_count, data)
+        if (phi%output) then
+          ! x-gradient
+          call timer_start(timer_index_nat_data)
+          call get_natural_data(par_env, mesh, phi%x_gradients, data)
+          call timer_stop(timer_index_nat_data)
+          data_name = "/d" // trim(phi%name) // "dx"
+          call write_array(sol_writer, data_name, sel_shape, sel_start, sel_count, data)
 
-        ! y-gradient
-        call timer_start(timer_index_nat_data)
-        call get_natural_data(par_env, mesh, output_list(i)%ptr%x_gradients, data)
-        call timer_stop(timer_index_nat_data)
-        data_name = "/d" // trim(output_list(i)%name) // "dy"
-        call write_array(sol_writer, data_name, sel_shape, sel_start, sel_count, data)
+          ! y-gradient
+          call timer_start(timer_index_nat_data)
+          call get_natural_data(par_env, mesh, phi%y_gradients, data)
+          call timer_stop(timer_index_nat_data)
+          data_name = "/d" // trim(phi%name) // "dy"
+          call write_array(sol_writer, data_name, sel_shape, sel_start, sel_count, data)
 
-        ! z-gradient
-        call timer_start(timer_index_nat_data)
-        call get_natural_data(par_env, mesh, output_list(i)%ptr%x_gradients, data)
-        call timer_stop(timer_index_nat_data)
-        data_name = "/d" // trim(output_list(i)%name) // "dz"
-        call write_array(sol_writer, data_name, sel_shape, sel_start, sel_count, data)
+          ! z-gradient
+          call timer_start(timer_index_nat_data)
+          call get_natural_data(par_env, mesh, phi%z_gradients, data)
+          call timer_stop(timer_index_nat_data)
+          data_name = "/d" // trim(phi%name) // "dz"
+          call write_array(sol_writer, data_name, sel_shape, sel_start, sel_count, data)
+        end if
       end do
       call timer_stop(timer_index_grad)
     end if

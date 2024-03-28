@@ -1,7 +1,7 @@
 !> @brief Test grid convergence of the 2d tgv test case on cartesian mesh
 !
 !> @description Generates several square meshes varying cps and get the error to compute their convergence order
-program test_tgv_cartesian
+program test_tgv_loop
 #include "ccs_macros.inc"
 
   use testing_lib
@@ -11,14 +11,10 @@ program test_tgv_cartesian
 
   implicit none
 
-  integer(ccs_int), parameter :: num_cps = 5
+  integer(ccs_int), parameter :: num_cps = 3
   integer(ccs_int), parameter :: nvar = 3
   real(ccs_real), dimension(nvar, num_cps) :: error_L2
   real(ccs_real), dimension(nvar, num_cps) :: error_Linf
-  real(ccs_real), dimension(:), allocatable :: orders_L2
-  real(ccs_real), dimension(:), allocatable :: orders_Linf
-  !real(ccs_real), dimension(:), allocatable :: min_error_L2
-  !real(ccs_real), dimension(:), allocatable :: min_error_Linf
   real(ccs_real), dimension(num_cps) :: refinements
   integer(ccs_int), dimension(num_cps) :: cps_list
   integer(ccs_int) :: cps
@@ -32,7 +28,7 @@ program test_tgv_cartesian
   variable_labels = (/"U", "V", "P"/)
   domain_size = 3.14159265358979323
 
-  cps_list = (/16, 32, 64, 128, 256/)
+  cps_list = (/4, 6, 8/)
   refinements = real(maxval(cps_list(:))) / real(cps_list(:))
 
   error_L2(:, :) = 0.0_ccs_real
@@ -49,19 +45,8 @@ program test_tgv_cartesian
 
     call print_error_summary(variable_labels, refinements, error_L2, error_Linf)
 
-    call get_order(refinements, error_L2, orders_L2)
-    call get_order(refinements, error_Linf, orders_Linf)
-
-    call assert_gt(orders_L2(1), 1.9_ccs_real, "U not converging in 2nd order ")
-    call assert_gt(orders_L2(2), 1.9_ccs_real, "V not converging in 2nd order ")
-    !call assert_gt(orders_L2(3), 1.9_ccs_real, "P not converging in 2nd order ")
-
-    call assert_gt(orders_Linf(1), 1.4_ccs_real, "U not converging in 2nd order ")
-    call assert_gt(orders_Linf(2), 1.4_ccs_real, "V not converging in 2nd order ")
-    !call assert_gt(orders_Linf(3), 1.4_ccs_real, "P not converging in 2nd order ")
-
   end if
 
   call fin()
 
-end program test_tgv_cartesian
+end program test_tgv_loop

@@ -11,18 +11,17 @@ module poiseuille_core
                          write_gradients, velocity_solver_method_name, velocity_solver_precon_name, &
                          pressure_solver_method_name, pressure_solver_precon_name
   use constants, only: cell, face, ccsconfig, ccs_string_len, geoext, adiosconfig, ndim, &
-                       field_u, field_v, field_w, field_p, field_p_prime, field_mf, field_viscosity, &
-                       field_density, cell_centred_central, cell_centred_upwind, face_centred
+                       cell_centred_central, cell_centred_upwind, face_centred
   use kinds, only: ccs_real, ccs_int, ccs_long
   use types, only: field, field_spec, upwind_field, central_field, face_field, ccs_mesh, &
                    vector_spec, ccs_vector, io_environment, io_process, &
-                   field_ptr, fluid, fluid_solver_selector, bc_profile
+                   field_ptr, fluid, bc_profile
   use fields, only: create_field, set_field_config_file, set_field_n_boundaries, set_field_name, &
        set_field_type, set_field_vector_properties, set_field_enable_cell_corrections
   use fortran_yaml_c_interface, only: parse
   use parallel, only: initialise_parallel_environment, &
                       cleanup_parallel_environment, timer, &
-                      read_command_line_arguments, sync
+                      read_command_line_arguments, sync, is_root
   use parallel_types, only: parallel_environment
   use vec, only: create_vector, set_vector_location, get_vector_data, restore_vector_data
   use petsctypes, only: vector_petsc
@@ -30,10 +29,11 @@ module poiseuille_core
   use utils, only: set_size, initialise, update, exit_print, &
                    calc_kinetic_energy, calc_enstrophy, &
                    add_field_to_outputlist, get_field, add_field, &
-                   get_fluid_solver_selector, set_fluid_solver_selector, &
+                   set_is_field_solved, &
                    allocate_fluid_fields, reset_outputlist_counter
   use boundary_conditions, only: read_bc_config, allocate_bc_arrays, set_bc_profile
-  use read_config, only: get_variables, get_boundary_count, get_case_name, get_enable_cell_corrections
+  use read_config, only: get_variables, get_boundary_count, get_case_name, get_enable_cell_corrections, &
+                          get_variable_types
   use timestepping, only: set_timestep, activate_timestepping, initialise_old_values, reset_timestepping
   use mesh_utils, only: read_mesh, build_square_mesh, write_mesh, compute_face_interpolation
   use meshing, only: get_total_num_cells, get_global_num_cells, set_mesh_object, nullify_mesh_object, get_local_num_cells
@@ -44,10 +44,14 @@ module poiseuille_core
   use utils, only: str
   use timers, only: timer_init, timer_register_start, timer_register, timer_start, timer_stop, &
                     timer_print, timer_get_time, timer_print_all, timer_reset
+  use vec, only: get_vector_data, restore_vector_data
 
   implicit none
 
   public :: run_poiseuille
+
+  character(len=ccs_string_len), dimension(:), allocatable :: variable_names  ! variable names for BC reading
+  integer(ccs_int), dimension(:), allocatable :: variable_types              ! cell centred upwind, central, etc.
 
   contains
 
@@ -69,13 +73,12 @@ module poiseuille_core
     type(vector_spec) :: vec_properties
 
     type(field_spec) :: field_properties
-    class(field), allocatable, target :: u, v, w, p, p_prime, mf, viscosity, density
+    class(field), pointer :: u, v, w, p, mf, viscosity, density
     type(bc_profile), allocatable :: profile
-
-    type(field_ptr), allocatable :: output_list(:)
 
     integer(ccs_int) :: n_boundaries
     logical :: enable_cell_corrections
+    integer :: i
 
     integer(ccs_int) :: it_start, it_end
     integer(ccs_int) :: irank ! MPI rank ID
@@ -91,7 +94,6 @@ module poiseuille_core
     logical :: p_sol = .true.
 
     type(fluid) :: flow_fields
-    type(fluid_solver_selector) :: fluid_sol
 
     call timer_init()
     irank = par_env%proc_id
@@ -158,58 +160,65 @@ module poiseuille_core
     call set_field_enable_cell_corrections(enable_cell_corrections, field_properties)
 
     call set_field_vector_properties(vec_properties, field_properties)
-    call set_field_type(cell_centred_central, field_properties)
-    call set_field_name("u", field_properties)
-    call create_field(field_properties, u)
-    call set_field_name("v", field_properties)
-    call create_field(field_properties, v)
-    call set_field_name("w", field_properties)
-    call create_field(field_properties, w)
 
-    call set_field_type(cell_centred_central, field_properties)
-    call set_field_name("p", field_properties)
-    call create_field(field_properties, p)
-    call set_field_name("p_prime", field_properties)
-    call create_field(field_properties, p_prime)
+    ! Expect to find u,v,w,p,p_prime
+    if (is_root(par_env)) then
+      print *, "Build field list"
+    end if
+
+    do i = 1, size(variable_names)
+      if (is_root(par_env)) then
+        print *, "Creating field ", trim(variable_names(i))
+      end if
+      call set_field_type(variable_types(i), field_properties)
+      call set_field_name(trim(variable_names(i)), field_properties)
+      call create_field(field_properties, flow_fields)
+    end do
+
+    if (is_root(par_env)) then
+      print *, "Built ", size(flow_fields%fields), " dynamically-defined fields"
+    end if
+
     call set_field_name("viscosity", field_properties)
-    call create_field(field_properties, viscosity) 
+    call create_field(field_properties, flow_fields)
     call set_field_name("density", field_properties)
-    call create_field(field_properties, density) 
-
-    ! Set to 1st boundary condition (inlet)
-    call get_inlet_profile(profile)
-    call set_bc_profile(u, profile, 1)
+    call create_field(field_properties, flow_fields) 
 
     call set_vector_location(face, vec_properties)
     call set_size(par_env, mesh, vec_properties)
     call set_field_vector_properties(vec_properties, field_properties)
     call set_field_type(face_centred, field_properties)
     call set_field_name("mf", field_properties)
-    call create_field(field_properties, mf)
+    call create_field(field_properties, flow_fields)
+
+    ! Get field pointers
+    call get_field(flow_fields, "u", u)
+    call get_field(flow_fields, "v", v)
+    call get_field(flow_fields, "w", w)
+    call get_field(flow_fields, "p", p)
+    call get_field(flow_fields, "mf", mf)
+    call get_field(flow_fields, "viscosity", viscosity)
+    call get_field(flow_fields, "density", density)
+    
+    ! Set to 1st boundary condition (inlet)
+    call get_inlet_profile(profile)
+    call set_bc_profile(u, profile, 1)
 
     ! Add fields to output list
-    call add_field_to_outputlist(u, "u", output_list)
-    call add_field_to_outputlist(v, "v", output_list)
-    call add_field_to_outputlist(w, "w", output_list)
-    call add_field_to_outputlist(p, "p", output_list)
+    call add_field_to_outputlist(u)
+    call add_field_to_outputlist(v)
+    call add_field_to_outputlist(w)
+    call add_field_to_outputlist(p)
 
     ! Initialise velocity field
     if (irank == par_env%root) print *, "Initialise velocity field"
-    call initialise_flow(u, v, w, p, mf, viscosity, density)
-    call update(u%values)
-    call update(v%values)
-    call update(w%values)
-    call update(p%values)
-    call update(mf%values)
-    call update(viscosity%values)
-    call update(density%values)
+    call initialise_flow(flow_fields)
+
     call calc_kinetic_energy(par_env, u, v, w)
     call calc_enstrophy(par_env, u, v, w)
 
     ! Solve using SIMPLE algorithm
     if (irank == par_env%root) print *, "Start SIMPLE"
-    call calc_kinetic_energy(par_env, u, v, w)
-    call calc_enstrophy(par_env, u, v, w)
 
     ! Write out mesh to file
     call write_mesh(par_env, case_path, mesh)
@@ -220,19 +229,19 @@ module poiseuille_core
     end if
 
     ! XXX: This should get incorporated as part of create_field subroutines
-    call set_fluid_solver_selector(field_u, u_sol, fluid_sol)
-    call set_fluid_solver_selector(field_v, v_sol, fluid_sol)
-    call set_fluid_solver_selector(field_w, w_sol, fluid_sol)
-    call set_fluid_solver_selector(field_p, p_sol, fluid_sol)
+    call set_is_field_solved(u_sol, u)
+    call set_is_field_solved(v_sol, v)
+    call set_is_field_solved(w_sol, w)
+    call set_is_field_solved(p_sol, p)
 
-    call add_field(u, flow_fields)
-    call add_field(v, flow_fields)
-    call add_field(w, flow_fields)
-    call add_field(p, flow_fields)
-    call add_field(p_prime, flow_fields)
-    call add_field(mf, flow_fields)
-    call add_field(viscosity, flow_fields) 
-    call add_field(density, flow_fields) 
+    ! Nullify pointers for safety
+    nullify(u)
+    nullify(v)
+    nullify(w)
+    nullify(p)
+    nullify(mf)
+    nullify(viscosity)
+    nullify(density)
 
     call timer_stop(timer_index_init)
     call timer_register_start("Solver time inc I/O", timer_index_sol)
@@ -249,22 +258,28 @@ module poiseuille_core
 
 
     call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
-                          fluid_sol, flow_fields)
+                          flow_fields)
+
+    ! This could be a postprocessing subroutine
+    call get_field(flow_fields, "u", u)
+    call get_field(flow_fields, "v", v)
+    call get_field(flow_fields, "w", w)
+    call get_field(flow_fields, "p", p)
     call calc_kinetic_energy(par_env, u, v, w)
     call calc_enstrophy(par_env, u, v, w)
 
     call calc_error(par_env, u, v, p, error_L2, error_Linf)
-    call write_solution(par_env, case_path, mesh, output_list)
+    nullify(u)
+    nullify(v)
+    nullify(w)
+    nullify(p)
+    nullify(mf)
+
+    call write_solution(par_env, case_path, mesh, flow_fields)
 
     call timer_stop(timer_index_sol)
 
     ! Clean-up
-    deallocate (u)
-    deallocate (v)
-    deallocate (w)
-    deallocate (p)
-    deallocate (p_prime)
-    deallocate (output_list)
 
     call timer_stop(timer_index_total)
 
@@ -289,7 +304,6 @@ module poiseuille_core
     class(*), pointer :: config_file  !< Pointer to CCS config file
     character(:), allocatable :: error
 
-    character(len=ccs_string_len), dimension(:), allocatable :: variable_names  ! variable names for BC reading
 
     config_file => parse(config_filename, error)
     if (allocated(error)) then
@@ -297,6 +311,15 @@ module poiseuille_core
     end if
 
     call get_variables(config_file, variable_names)
+    if (size(variable_names) == 0) then
+      call error_abort("No variables were specified.")
+    end if
+    print*,"no. of variables=",size(variable_names)
+
+    call get_variable_types(config_file, variable_types)
+    if (size(variable_types) /= size(variable_names)) then
+       call error_abort("The number of variable types does not match the number of named variables")
+    end if
 
     call get_value(config_file, 'steps', num_steps)
     if (num_steps == huge(0)) then
@@ -374,7 +397,7 @@ module poiseuille_core
 
   end subroutine
 
-  subroutine initialise_flow(u, v, w, p, mf, viscosity, density)
+  subroutine initialise_flow(flow_fields)
 
     use constants, only: insert_mode, ndim
     use types, only: vector_values, cell_locator, face_locator, neighbour_locator
@@ -386,9 +409,10 @@ module poiseuille_core
     use vec, only: get_vector_data, restore_vector_data, create_vector_values
 
     ! Arguments
-    class(field), intent(inout) :: u, v, w, p, mf, viscosity, density
+    type(fluid), intent(inout) :: flow_fields
 
     ! Local variables
+    class(field), pointer :: u, v, w, p, mf, mu, rho
     integer(ccs_int) :: n, count
     integer(ccs_int) :: n_local
     integer(ccs_int) :: index_p, global_index_p, index_f, index_nb
@@ -439,10 +463,24 @@ module poiseuille_core
       call set_entry(p_val, p_vals)
     end do
 
+    call get_field(flow_fields, "u", u)
+    call get_field(flow_fields, "v", v)
+    call get_field(flow_fields, "w", w)
+    call get_field(flow_fields, "p", p)
+
     call set_values(u_vals, u%values)
     call set_values(v_vals, v%values)
     call set_values(w_vals, w%values)
     call set_values(p_vals, p%values)
+
+    call update(u%values)
+    call update(v%values)
+    call update(w%values)
+    call update(p%values)
+    nullify(u)
+    nullify(v)
+    nullify(w)
+    nullify(p)
 
     deallocate (u_vals%global_indices)
     deallocate (v_vals%global_indices)
@@ -452,6 +490,8 @@ module poiseuille_core
     deallocate (v_vals%values)
     deallocate (w_vals%values)
     deallocate (p_vals%values)
+
+    call get_field(flow_fields, "mf", mf)
 
     call get_vector_data(mf%values, mf_data)
 
@@ -485,22 +525,24 @@ module poiseuille_core
     end do
 
     call restore_vector_data(mf%values, mf_data)
-
-    call get_vector_data(viscosity%values, viscosity_data)
-    viscosity_data(:) =  1.e-2_ccs_real
-    call restore_vector_data(viscosity%values, viscosity_data)
-
-    call get_vector_data(density%values, density_data)
-    density_data(:) = 1.0_ccs_real
-    call restore_vector_data(density%values, density_data)
-
-    call update(u%values)
-    call update(v%values)
-    call update(w%values)
-    call update(p%values)
     call update(mf%values)
-    call update(viscosity%values)
-    call update(density%values)
+    nullify(mf)
+
+    call get_field(flow_fields, "viscosity", mu)
+    call get_field(flow_fields, "density", rho)
+
+    call get_vector_data(mu%values, viscosity_data)
+    viscosity_data(:) =  1.e-2_ccs_real
+    call restore_vector_data(mu%values, viscosity_data)
+
+    call get_vector_data(rho%values, density_data)
+    density_data(:) = 1.0_ccs_real
+    call restore_vector_data(rho%values, density_data)
+
+    call update(mu%values)
+    call update(rho%values)
+    nullify(mu)
+    nullify(rho)
 
   end subroutine initialise_flow
 
