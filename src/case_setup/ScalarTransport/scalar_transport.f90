@@ -185,15 +185,7 @@ program scalar_transport
     nullify(phi)
   end do
 
-  call read_solution(par_env, case_path, mesh, output_list)
-  call get_vector_data(output_list(1)%ptr%values, output_data)
-
-  call get_local_num_cells(n_local)
-  do index_p = 1, n_local
-    print*, index_p, output_data(index_p)
-  end do
-
-  call restore_vector_data(output_list(1)%ptr%values, output_data)
+  call read_solution(par_env, case_path, mesh, flow_fields)
 
   if (irank == par_env%root) then
     call print_configuration()
