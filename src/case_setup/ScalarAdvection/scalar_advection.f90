@@ -17,15 +17,15 @@ program scalar_advection
   use constants, only: cell, face, ccsconfig, ccs_string_len, geoext, adiosconfig, ndim, &
                        cell_centred_central, cell_centred_upwind, face_centred, &
                        ccs_split_type_shared, ccs_split_type_low_high, ccs_split_undefined
-  use meshing, only: get_boundary_status, create_face_locator, get_total_num_cells, get_global_num_cells
+  use meshing, only: get_boundary_status, create_face_locator, get_total_num_cells, get_global_num_cells, get_local_num_cells
   use fields, only: create_field, set_field_config_file, set_field_n_boundaries, set_field_name, &
        set_field_type, set_field_vector_properties, set_field_enable_cell_corrections
   use fortran_yaml_c_interface, only: parse
-  use vec, only: create_vector, set_vector_location
+  use vec, only: create_vector, set_vector_location, get_vector_data, restore_vector_data
   use mat, only: create_matrix, set_nnz
   use solver, only: create_solver, solve, set_equation_system
   use utils, only: update, initialise, set_size, add_field_to_outputlist, exit_print, finalise, zero, &
-                   get_field
+                   get_field, get_field
   use mesh_utils, only: build_square_mesh, write_mesh, compute_face_interpolation
   use meshing, only: set_mesh_object, nullify_mesh_object
   use parallel_types, only: parallel_environment
@@ -33,7 +33,7 @@ program scalar_advection
                       cleanup_parallel_environment, timer, &
                       read_command_line_arguments, is_root
   use fv, only: compute_fluxes, update_gradient
-  use io_visualisation, only: write_solution
+  use io_visualisation, only: write_solution, read_solution
   use read_config, only: get_variables, get_boundary_count, get_case_name, get_enable_cell_corrections, get_variable_types
   use boundary_conditions, only: read_bc_config, allocate_bc_arrays
   use timers, only: timer_init, timer_register_start, timer_register, timer_start, timer_stop, timer_print, timer_get_time, timer_print_all
@@ -50,6 +50,10 @@ program scalar_advection
   character(len=:), allocatable :: ccs_config_file ! Config file for CCS
   character(len=ccs_string_len), dimension(:), allocatable :: variable_names  ! variable names for BC reading
   integer(ccs_int), dimension(:), allocatable :: variable_types              ! cell centred upwind, central, etc.
+
+  real(ccs_real), dimension(:), pointer :: output_data
+  integer(ccs_int) :: index_p
+  integer(ccs_int) :: n_local
 
   type(vector_spec) :: vec_properties
   type(matrix_spec) :: mat_properties
@@ -221,6 +225,19 @@ program scalar_advection
 
   call finalise(M)
 
+  call read_solution(par_env, case_path, mesh, flow_fields)
+  call get_field(flow_fields, "u", u) 
+  call get_vector_data(u%values, output_data)
+
+  call get_local_num_cells(n_local)
+  do index_p = 1, n_local
+    print*, index_p, output_data(index_p)
+  end do
+
+  call restore_vector_data(u%values, output_data)
+  call update(u%values)
+  nullify(u)
+
   ! Create linear solver & set options
   if (irank == par_env%root) print *, "Solve"
   call get_field(flow_fields, "scalar", scalar)
@@ -231,6 +248,15 @@ program scalar_advection
 
   call write_mesh(par_env, case_path, mesh)
   call write_solution(par_env, case_path, mesh, flow_fields)
+
+  call get_vector_data(u%values, output_data)
+  
+  call get_local_num_cells(n_local)
+  do index_p = 1, n_local
+    print*, index_p, output_data(index_p)
+  end do
+
+  call restore_vector_data(u%values, output_data)
 
   ! Clean up
   deallocate(source)
