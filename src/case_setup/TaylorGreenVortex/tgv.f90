@@ -56,15 +56,11 @@ program tgv
   character(len = ccs_string_len), dimension(:), allocatable:: variable_names  ! variable names for BC reading
   integer(ccs_int), dimension(:), allocatable:: variable_types              ! cell centred upwind, central, etc.
 
-<<<<<<< HEAD
   real(ccs_real), dimension(:), pointer :: output_data
   integer(ccs_int) :: index_p
   integer(ccs_int) :: n_local
 
   type(vector_spec) :: vec_properties
-=======
-  type(vector_spec):: vec_properties
->>>>>>> develop
 
   type(field_spec):: field_properties
   class(field), pointer:: u, v, w, p, mf, viscosity, density
@@ -262,15 +258,8 @@ program tgv
   nullify(viscosity)
   nullify(density)
 
-  call read_solution(par_env, case_path, mesh, output_list)
-  call get_vector_data(output_list(1)%ptr%values, output_data)
+  call read_solution(par_env, case_path, mesh, flow_fields)
 
-  call get_local_num_cells(n_local)
-  do index_p = 1, n_local
-    print*, index_p, output_data(index_p)
-  end do
-
-  call restore_vector_data(output_list(1)%ptr%values, output_data)
 
   call timer_stop(timer_index_init)
   call timer_register("I/O time for solution", timer_index_io_sol)
