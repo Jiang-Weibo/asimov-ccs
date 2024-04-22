@@ -205,18 +205,18 @@ program ldc
   nullify(viscosity)
   nullify(density)
 
-  call read_solution(par_env, case_path, mesh, flow_fields)
-  call get_field(flow_fields, "u", u) 
-  call get_vector_data(u%values, output_data)
+  !call read_solution(par_env, case_path, mesh, flow_fields)
+  !call get_field(flow_fields, "u", u) 
+  !call get_vector_data(u%values, output_data)
   
-  call get_local_num_cells(n_local)
-  do index_p = 1, n_local
-    print*, index_p, output_data(index_p)
-  end do
+  !call get_local_num_cells(n_local)
+  !do index_p = 1, n_local
+    !print*, index_p, output_data(index_p)
+  !end do
 
-  call restore_vector_data(u%values, output_data)
-  call update(u%values)
-  nullify(u)
+  !call restore_vector_data(u%values, output_data)
+  !call update(u%values)
+  !nullify(u)
 
   if (irank == par_env%root) then
     call print_configuration()
@@ -230,18 +230,18 @@ program ldc
                        flow_fields)
   
   ! Write out mesh and solution
-  call write_mesh(par_env, case_path, mesh)
+  !call write_mesh(par_env, case_path, mesh)
   
-  call write_solution(par_env, case_path, mesh, flow_fields)
+  !call write_solution(par_env, case_path, mesh, flow_fields)
 
-  call get_vector_data(u%values, output_data)
+  !call get_vector_data(u%values, output_data)
   
-  call get_local_num_cells(n_local)
-  do index_p = 1, n_local
-    print*, index_p, output_data(index_p)
-  end do
+  !call get_local_num_cells(n_local)
+  !do index_p = 1, n_local
+    !print*, index_p, output_data(index_p)
+  !end do
 
-  call restore_vector_data(u%values, output_data)
+  !call restore_vector_data(u%values, output_data)
 
   call timer_stop(timer_index_sol)
 
