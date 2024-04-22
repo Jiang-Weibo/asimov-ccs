@@ -230,9 +230,9 @@ program ldc
                        flow_fields)
   
   ! Write out mesh and solution
-  !call write_mesh(par_env, case_path, mesh)
+  call write_mesh(par_env, case_path, mesh)
   
-  !call write_solution(par_env, case_path, mesh, flow_fields)
+  call write_solution(par_env, case_path, mesh, flow_fields)
 
   !call get_vector_data(u%values, output_data)
   

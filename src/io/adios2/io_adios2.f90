@@ -168,7 +168,7 @@ contains
     integer(int64), dimension(1), intent(in) :: global_start !< What global index to start reading from
     integer(int64), dimension(1), intent(in) :: count        !< How many array element to read
     integer(int32), dimension(:), intent(inout) :: var       !< The 1D integer array
-    integer(int32), optional, intent(in) :: step             !< The step to read
+    integer(int64), optional, intent(in) :: step             !< The step to read
 
     type(adios2_variable) :: adios2_var
     integer(int64), dimension(:), allocatable :: tmp_var64
@@ -255,7 +255,7 @@ contains
     integer(int64), dimension(2), intent(in) :: global_start !< What global index to start reading from
     integer(int64), dimension(2), intent(in) :: count        !< How many array elements to read
     integer(int32), dimension(:, :), intent(inout) :: var    !< The 2D integer array
-    integer(int32), optional, intent(in) :: step             !< The step to read
+    integer(int64), optional, intent(in) :: step             !< The step to read
 
     type(adios2_variable) :: adios2_var
     integer(int64), dimension(:, :), allocatable :: tmp_var64
@@ -342,7 +342,7 @@ contains
     integer(int64), dimension(1), intent(in) :: global_start !< What global index to start reading from
     integer(int64), dimension(1), intent(in) :: count        !< How many array element to read
     real(real32), dimension(:), intent(inout) :: var         !< The 1D real array
-    integer(int32), optional, intent(in) :: step             !< The step to read
+    integer(int64), optional, intent(in) :: step             !< The step to read
 
     type(adios2_variable) :: adios2_var
     real(real64), dimension(:), allocatable :: tmp_var64
@@ -434,7 +434,7 @@ contains
     integer(int64), dimension(2), intent(in) :: global_start !< What global index to start reading from
     integer(int64), dimension(2), intent(in) :: count        !< How many array element to read
     real(real32), dimension(:, :), intent(inout) :: var      !< The 2D real array
-    integer(int32), optional, intent(in) :: step             !< The step to read
+    integer(int64), optional, intent(in) :: step             !< The step to read
 
     type(adios2_variable) :: adios2_var
     real(real64), dimension(:, :), allocatable :: tmp_var64
