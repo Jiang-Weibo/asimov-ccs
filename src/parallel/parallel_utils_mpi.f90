@@ -181,10 +181,10 @@ contains
     integer(ccs_int) :: dummy_int = 1_ccs_int
     integer(ccs_err) :: ierr
     integer :: disp_unit
-    integer(mpi_address_kind) :: byte_size, allocate_byte_size
+    integer(kind=8) :: byte_size, allocate_byte_size
 
     disp_unit = c_sizeof(dummy_int)
-    byte_size = length(1) * length(2) * disp_unit
+    byte_size = int8(length(1)) * int8(length(2)) * int8(disp_unit)
 
     if (is_root(shared_env)) then
       allocate_byte_size = byte_size
@@ -263,10 +263,10 @@ contains
     real(ccs_real) :: dummy_real = 1.0_ccs_real
     integer(ccs_err) :: ierr
     integer :: disp_unit
-    integer(mpi_address_kind) :: byte_size, allocate_byte_size
+    integer(kind=8) :: byte_size, allocate_byte_size
 
     disp_unit = c_sizeof(dummy_real)
-    byte_size = length(1) * length(2) * disp_unit
+    byte_size = int8(length(1)) * int8(length(2)) * disp_unit
 
     if (is_root(shared_env)) then
       allocate_byte_size = byte_size
