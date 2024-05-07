@@ -9,7 +9,7 @@ program sandia
   use case_config, only: num_steps, num_iters, dt, domain_size, write_frequency, &
                          velocity_relax, pressure_relax, res_target, case_name, &
                          write_gradients, velocity_solver_method_name, velocity_solver_precon_name, &
-                         pressure_solver_method_name, pressure_solver_precon_name, vertex_neighbours
+                         pressure_solver_method_name, pressure_solver_precon_name
   use constants, only: cell, face, ccsconfig, ccs_string_len, geoext, adiosconfig, ndim, &
                        cell_centred_central, cell_centred_upwind, face_centred, &
                        ccs_split_type_shared, ccs_split_type_low_high, ccs_split_undefined
@@ -54,13 +54,13 @@ program sandia
   character(len=:), allocatable:: case_path  ! Path to input directory with case name appended
   character(len=:), allocatable:: ccs_config_file  ! Config file for CCS
   character(len = ccs_string_len), dimension(:), allocatable:: variable_names  ! variable names for BC reading
-  integer(ccs_int), dimension(:), allocatable :: variable_types              ! cell centred upwind, central, etc.
+  integer(ccs_int), dimension(:), allocatable:: variable_types              ! cell centred upwind, central, etc.
 
   type(vector_spec):: vec_properties
 
   type(field_spec):: field_properties
-  class(field), pointer :: u, v, w, p, mf, viscosity, density
-  class(field), pointer :: scalar_field
+  class(field), pointer:: u, v, w, p, mf, viscosity, density
+  class(field), pointer:: scalar_field
 
   integer(ccs_int):: n_boundaries
 
@@ -74,7 +74,7 @@ program sandia
   integer(ccs_int):: timer_index_io_init
   integer(ccs_int):: timer_index_io_sol
   integer(ccs_int):: timer_index_sol
-  integer(ccs_int) :: i
+  integer(ccs_int):: i
 
   logical:: u_sol = .true.  ! Default equations to solve for LDC case
   logical:: v_sol = .true.
@@ -130,9 +130,6 @@ program sandia
   it_start = 1
   it_end = num_iters
 
-  ! Hard coding to whether or not vertex neighbours are built
-  vertex_neighbours = .false. ! set to .false. to avoid building
-
   ! Read mesh from .geo file
   call timer_register_start("Mesh read time", timer_index_build)
   if (irank == par_env%root) print *, "Reading mesh file"
@@ -167,7 +164,7 @@ program sandia
 
   call set_field_vector_properties(vec_properties, field_properties)
 
-  ! Expect to find u,v,w,p,p_prime,scalar
+  ! Expect to find u, v, w, p, p_prime, scalar
   if (is_root(par_env)) then
     print *, "Build field list"
   end if
@@ -178,24 +175,25 @@ program sandia
     end if
     call set_field_type(variable_types(i), field_properties)
     call set_field_name(variable_names(i), field_properties)
-    call create_field(field_properties, flow_fields)
+    call create_field(par_env, field_properties, flow_fields)
   end do
 
   if (is_root(par_env)) then
     print *, "Built ", size(flow_fields%fields), " dynamically-defined fields"
   end if
 
+  call set_field_type(cell_centred_central, field_properties)
   call set_field_name("viscosity", field_properties)
-  call create_field(field_properties, flow_fields)
+  call create_field(par_env, field_properties, flow_fields)
   call set_field_name("density", field_properties)
-  call create_field(field_properties, flow_fields)
+  call create_field(par_env, field_properties, flow_fields)
 
   call set_vector_location(face, vec_properties)
   call set_size(par_env, mesh, vec_properties)
   call set_field_vector_properties(vec_properties, field_properties)
   call set_field_type(face_centred, field_properties)
   call set_field_name("mf", field_properties)
-  call create_field(field_properties, flow_fields)
+  call create_field(par_env, field_properties, flow_fields)
 
   call get_field(flow_fields, "u", u)
   call get_field(flow_fields, "v", v)
@@ -251,9 +249,10 @@ program sandia
 
   call timer_stop(timer_index_init)
   call timer_register("I/O time for solution", timer_index_io_sol)
-  call timer_register_start("Solver time inc I/O", timer_index_sol)
+  call timer_register("Solver time inc I/O", timer_index_sol)
 
   do t = 1, num_steps
+    call timer_start(timer_index_sol)
     call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
                          flow_fields, diverged)
     if (par_env%proc_id == par_env%root) then
@@ -273,9 +272,8 @@ program sandia
       call write_solution(par_env, case_path, mesh, flow_fields, t, num_steps, dt)
       call timer_stop(timer_index_io_sol)
     end if
+    call timer_stop(timer_index_sol)
   end do
-
-  call timer_stop(timer_index_sol)
 
   ! Clean-up
 
@@ -388,11 +386,11 @@ contains
     use vec, only: get_vector_data, restore_vector_data, create_vector_values
 
     ! Arguments
-    type(fluid), intent(inout) :: flow_fields
+    type(fluid), intent(inout):: flow_fields
 
     ! Local variables
-    class(field), pointer :: u, v, w, p, scalar
-    class(field), pointer :: mf, mu, rho
+    class(field), pointer:: u, v, w, p, scalar
+    class(field), pointer:: mf, mu, rho
     integer(ccs_int):: n, count
     integer(ccs_int):: n_local
     integer(ccs_int):: index_p, global_index_p, index_f, index_nb

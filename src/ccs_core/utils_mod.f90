@@ -13,7 +13,7 @@ module utils
                  set_vector_values_mode, set_vector_values_row, set_vector_values_entry, &
                  clear_vector_values_entries, &
                  mult_vec_vec, scale_vec, zero_vector, &
-                 get_natural_data_vec
+                 get_natural_data_vec, reorder_data_vec
   use mat, only: set_matrix_values, update_matrix, begin_update_matrix, end_update_matrix, &
                  initialise_matrix, finalise_matrix, set_matrix_size, &
                  set_matrix_values_mode, set_matrix_values_row, set_matrix_values_col, set_matrix_values_entry, &
@@ -21,7 +21,8 @@ module utils
   use solver, only: initialise_equation_system
   use kinds, only: ccs_int, ccs_real
   use types, only: field, fluid, field_ptr
-  use constants, only: cell_centred_central, cell_centred_upwind
+  use constants, only: cell_centred_central, cell_centred_upwind, face_centred, cell_centred_gamma, &
+                       cell_centred_linear_upwind
   use error_codes
 
   implicit none
@@ -56,6 +57,7 @@ module utils
   public :: allocate_fluid_fields
   public :: dealloc_fluid_fields
   public :: get_natural_data
+  public :: reorder_data
   public :: get_scheme_name
   public :: get_scheme_id
 
@@ -161,6 +163,10 @@ module utils
   interface get_natural_data
     module procedure get_natural_data_vec
   end interface get_natural_data
+
+  interface reorder_data
+    module procedure reorder_data_vec
+  end interface reorder_data
 
   !> Generic interface to get a field from the flow
   interface get_field
@@ -555,9 +561,15 @@ contains
 
     scheme = trim(scheme_name)
     if (scheme == "central") then
-       id = cell_centred_central
+      id = cell_centred_central
     else if (scheme == "upwind") then
-       id = cell_centred_upwind
+      id = cell_centred_upwind
+    else if (scheme == "face") then
+      id = face_centred
+    else if (scheme == "gamma") then
+      id = cell_centred_gamma
+    else if (scheme == "luds") then
+      id = cell_centred_linear_upwind
     else
       error stop unknown_scheme ! Unknown discretisation scheme
     end if
@@ -572,9 +584,15 @@ contains
     character(len=:), allocatable :: scheme_name
 
     if (scheme_id == cell_centred_central) then
-       scheme_name = "central"
+      scheme_name = "central"
     else if (scheme_id == cell_centred_upwind) then
-       scheme_name = "upwind"
+      scheme_name = "upwind"
+    else if (scheme_id == face_centred) then
+      scheme_name = "face"
+    else if (scheme_id == cell_centred_gamma) then
+      scheme_name = "gamma"
+    else if (scheme_id == cell_centred_linear_upwind) then
+      scheme_name = "luds"
     else
       error stop unknown_scheme ! Unknown discretisation scheme ID
     end if

@@ -9,7 +9,7 @@ program bfs
   use case_config, only: num_steps, num_iters, dt, domain_size, write_frequency, &
                          velocity_relax, pressure_relax, res_target, case_name, &
                          write_gradients, velocity_solver_method_name, velocity_solver_precon_name, &
-                         pressure_solver_method_name, pressure_solver_precon_name, vertex_neighbours
+                         pressure_solver_method_name, pressure_solver_precon_name
   use constants, only: cell, face, ccsconfig, ccs_string_len, geoext, adiosconfig, ndim, &
                        cell_centred_central, cell_centred_upwind, face_centred, &
                        ccs_split_type_shared, ccs_split_type_low_high, ccs_split_undefined
@@ -118,9 +118,6 @@ program bfs
   it_start = 1
   it_end = num_iters
 
-  ! Hard coding to whether or not vertex neighbours are built
-  vertex_neighbours = .false. ! set to .false. to avoid building
-
   ! Read mesh from .geo file
   if (irank == par_env%root) print *, "Reading mesh file"
   call get_boundary_names(ccs_config_file, bnd_names)
@@ -163,7 +160,7 @@ program bfs
     end if
     call set_field_type(variable_types(i), field_properties)
     call set_field_name(trim(variable_names(i)), field_properties)
-    call create_field(field_properties, flow_fields)
+    call create_field(par_env, field_properties, flow_fields)
   end do
 
   if (is_root(par_env)) then
@@ -171,18 +168,18 @@ program bfs
   end if
 
   ! Expect u, w, p, p_prime to be created dynamically
-  call create_field(field_properties, flow_fields)
+  call set_field_type(cell_centred_central, field_properties)
   call set_field_name("viscosity", field_properties)
-  call create_field(field_properties, flow_fields)
+  call create_field(par_env, field_properties, flow_fields)
   call set_field_name("density", field_properties)
-  call create_field(field_properties, flow_fields)
+  call create_field(par_env, field_properties, flow_fields)
 
   call set_vector_location(face, vec_properties)
   call set_size(par_env, mesh, vec_properties)
   call set_field_vector_properties(vec_properties, field_properties)
   call set_field_type(face_centred, field_properties)
   call set_field_name("mf", field_properties)
-  call create_field(field_properties, flow_fields)
+  call create_field(par_env, field_properties, flow_fields)
 
   ! Read and set BC profiles
   ! Read u componemt (1st column)

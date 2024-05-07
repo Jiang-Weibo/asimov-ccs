@@ -184,7 +184,7 @@ contains
     integer(mpi_address_kind) :: byte_size, allocate_byte_size
 
     disp_unit = c_sizeof(dummy_int)
-    byte_size = length(1) * length(2) * disp_unit
+    byte_size = int(length(1), kind=8) * int(length(2), kind=8) * int(disp_unit, kind=8)
 
     if (is_root(shared_env)) then
       allocate_byte_size = byte_size
@@ -266,7 +266,7 @@ contains
     integer(mpi_address_kind) :: byte_size, allocate_byte_size
 
     disp_unit = c_sizeof(dummy_real)
-    byte_size = length(1) * length(2) * disp_unit
+    byte_size = int(length(1), kind=8) * int(length(2), kind=8) * int(disp_unit, kind=8)
 
     if (is_root(shared_env)) then
       allocate_byte_size = byte_size

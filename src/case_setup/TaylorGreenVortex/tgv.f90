@@ -10,7 +10,7 @@ program tgv
   use case_config, only: num_steps, num_iters, dt, cps, domain_size, write_frequency, &
                          velocity_relax, pressure_relax, res_target, case_name, &
                          write_gradients, velocity_solver_method_name, velocity_solver_precon_name, &
-                         pressure_solver_method_name, pressure_solver_precon_name, vertex_neighbours, &
+                         pressure_solver_method_name, pressure_solver_precon_name, &
                          compute_bwidth, compute_partqual
   use constants, only: cell, face, ccsconfig, ccs_string_len, geoext, adiosconfig, ndim, &
                        cell_centred_central, cell_centred_upwind, face_centred
@@ -49,47 +49,47 @@ program tgv
 
   implicit none
 
-  class(parallel_environment), allocatable :: par_env
-  class(parallel_environment), allocatable :: shared_env
-  character(len=:), allocatable :: input_path  ! Path to input directory
-  character(len=:), allocatable :: case_path  ! Path to input directory with case name appended
-  character(len=:), allocatable :: ccs_config_file ! Config file for CCS
-  character(len=ccs_string_len), dimension(:), allocatable :: variable_names  ! variable names for BC reading
-  integer(ccs_int), dimension(:), allocatable :: variable_types              ! cell centred upwind, central, etc.
+  class(parallel_environment), allocatable:: par_env
+  class(parallel_environment), allocatable:: shared_env
+  character(len=:), allocatable:: input_path  ! Path to input directory
+  character(len=:), allocatable:: case_path  ! Path to input directory with case name appended
+  character(len=:), allocatable:: ccs_config_file  ! Config file for CCS
+  character(len = ccs_string_len), dimension(:), allocatable:: variable_names  ! variable names for BC reading
+  integer(ccs_int), dimension(:), allocatable:: variable_types              ! cell centred upwind, central, etc.
 
-  type(vector_spec) :: vec_properties
+  type(vector_spec):: vec_properties
 
-  type(field_spec) :: field_properties
-  class(field), pointer :: u, v, w, p, mf, viscosity, density
+  type(field_spec):: field_properties
+  class(field), pointer:: u, v, w, p, mf, viscosity, density
 
-  integer(ccs_int) :: n_boundaries
+  integer(ccs_int):: n_boundaries
 
-  integer(ccs_int) :: it_start, it_end
-  integer(ccs_int) :: irank ! MPI rank ID
-  integer(ccs_int) :: isize ! Size of MPI world
+  integer(ccs_int):: it_start, it_end
+  integer(ccs_int):: irank  ! MPI rank ID
+  integer(ccs_int):: isize  ! Size of MPI world
 
-  integer(ccs_int) :: timer_index_total
-  integer(ccs_int) :: timer_index_init
-  integer(ccs_int) :: timer_index_build
-  integer(ccs_int) :: timer_index_io_init
-  integer(ccs_int) :: timer_index_io_sol
-  integer(ccs_int) :: timer_index_sol
-  integer(ccs_int) :: i
+  integer(ccs_int):: timer_index_total
+  integer(ccs_int):: timer_index_init
+  integer(ccs_int):: timer_index_build
+  integer(ccs_int):: timer_index_io_init
+  integer(ccs_int):: timer_index_io_sol
+  integer(ccs_int):: timer_index_sol
+  integer(ccs_int):: i
 
-  double precision :: sol_time, io_time
+  double precision:: sol_time, io_time
 
-  logical :: u_sol = .true.  ! Default equations to solve for LDC case
-  logical :: v_sol = .true.
-  logical :: w_sol = .true.
-  logical :: p_sol = .true.
+  logical:: u_sol = .true.  ! Default equations to solve for LDC case
+  logical:: v_sol = .true.
+  logical:: w_sol = .true.
+  logical:: p_sol = .true.
 
-  logical :: store_residuals, enable_cell_corrections
+  logical:: store_residuals, enable_cell_corrections
 
-  integer(ccs_int) :: t          ! Timestep counter
+  integer(ccs_int):: t          ! Timestep counter
 
-  type(fluid) :: flow_fields
+  type(fluid):: flow_fields
 
-  logical :: use_mpi_splitting
+  logical:: use_mpi_splitting
 
   character(len=128), dimension(:), allocatable :: bnd_names
   
@@ -104,7 +104,7 @@ program tgv
   use_mpi_splitting = .true.
   call create_new_par_env(par_env, ccs_split_type_shared, use_mpi_splitting, shared_env)
 
-  call read_command_line_arguments(par_env, cps, case_name=case_name, in_dir=input_path)
+  call read_command_line_arguments(par_env, cps, case_name = case_name, in_dir = input_path)
 
   if (allocated(input_path)) then
     case_path = input_path // "/" // case_name
@@ -132,9 +132,6 @@ program tgv
   ! Set start and end iteration numbers (read from input file)
   it_start = 1
   it_end = num_iters
-
-  ! Hard coding to whether or not vertex neighbours are built
-  vertex_neighbours = .true. ! set to .false. to avoid building
 
   ! If cps is no longer the default value, it has been set explicity and
   ! the mesh generator is invoked...
@@ -177,7 +174,7 @@ program tgv
 
   call set_field_vector_properties(vec_properties, field_properties)
 
-  ! Expect to find u,v,w,p,p_prime
+  ! Expect to find u, v, w, p, p_prime
   if (is_root(par_env)) then
     print *, "Build field list"
   end if
@@ -188,24 +185,25 @@ program tgv
     end if
     call set_field_type(variable_types(i), field_properties)
     call set_field_name(variable_names(i), field_properties)
-    call create_field(field_properties, flow_fields)
+    call create_field(par_env, field_properties, flow_fields)
   end do
 
   if (is_root(par_env)) then
     print *, "Built ", size(flow_fields%fields), " dynamically-defined fields"
   end if
 
+  call set_field_type(cell_centred_central, field_properties)
   call set_field_name("viscosity", field_properties)
-  call create_field(field_properties, flow_fields)
+  call create_field(par_env, field_properties, flow_fields)
   call set_field_name("density", field_properties)
-  call create_field(field_properties, flow_fields)
+  call create_field(par_env, field_properties, flow_fields)
 
   call set_vector_location(face, vec_properties)
   call set_size(par_env, mesh, vec_properties)
   call set_field_vector_properties(vec_properties, field_properties)
   call set_field_type(face_centred, field_properties)
   call set_field_name("mf", field_properties)
-  call create_field(field_properties, flow_fields)
+  call create_field(par_env, field_properties, flow_fields)
 
   ! Get field pointers
   call get_field(flow_fields, "u", u)
@@ -263,9 +261,10 @@ program tgv
 
   call timer_stop(timer_index_init)
   call timer_register("I/O time for solution", timer_index_io_sol)
-  call timer_register_start("Solver time inc I/O", timer_index_sol)
+  call timer_register("Solver time inc I/O", timer_index_sol)
 
   do t = 1, num_steps
+    call timer_start(timer_index_sol)
     call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
                          flow_fields)
 
@@ -297,9 +296,9 @@ program tgv
       call timer_stop(timer_index_io_sol)
     end if
 
+    call timer_stop(timer_index_sol)
   end do
 
-  call timer_stop(timer_index_sol)
 
   ! Clean-up
   nullify(u)
@@ -315,8 +314,8 @@ program tgv
   call timer_get_time(timer_index_sol, sol_time)
   call timer_get_time(timer_index_io_sol, io_time)
   if (irank == par_env%root) then
-    write(*,'(A30, F10.4, A)') "Solver time no I/O:", sol_time - io_time, " s"
-    write(*,'(A30, F10.4, A)') "Average time/step (no I/O):", (sol_time - io_time)/num_steps, " s"
+    write(*,'(A30, F10.4, A)') "Solver time no I/O:", sol_time-io_time, " s"
+    write(*,'(A30, F10.4, A)') "Average time/step (no I/O):", (sol_time-io_time)/num_steps, " s"
   end if
 
   call nullify_mesh_object()
@@ -331,10 +330,10 @@ contains
     use read_config, only: get_reference_number, get_value, &
                            get_relaxation_factors
 
-    character(len=*), intent(in) :: config_filename
+    character(len=*), intent(in):: config_filename
 
-    class(*), pointer :: config_file  !< Pointer to CCS config file
-    character(:), allocatable :: error
+    class(*), pointer:: config_file  !< Pointer to CCS config file
+    character(:), allocatable:: error
 
     config_file => parse(config_filename, error)
     if (allocated(error)) then
@@ -365,7 +364,7 @@ contains
       call error_abort("No value assigned to dt.")
     end if
 
-    if (cps == huge(0)) then ! cps was not set on the command line
+    if (cps == huge(0)) then  ! cps was not set on the command line
       call get_value(config_file, 'cps', cps)
       if (cps == huge(0)) then
         call error_abort("No value assigned to cps.")
@@ -387,7 +386,7 @@ contains
       call error_abort("No value assigned to target residual.")
     end if
 
-    call get_relaxation_factors(config_file, u_relax=velocity_relax, p_relax=pressure_relax)
+    call get_relaxation_factors(config_file, u_relax = velocity_relax, p_relax = pressure_relax)
     if (velocity_relax == huge(0.0) .and. pressure_relax == huge(0.0)) then
       call error_abort("No values assigned to velocity and pressure underrelaxation.")
     end if
@@ -402,7 +401,7 @@ contains
 
     use meshing, only: get_global_num_cells
 
-    integer(ccs_int) :: global_num_cells
+    integer(ccs_int):: global_num_cells
 
     call get_global_num_cells(global_num_cells)
 
@@ -415,18 +414,18 @@ contains
     print *, "******************************************************************************"
     print *, "* SIMULATION LENGTH"
     print *, "* Running for ", num_steps, "timesteps and ", num_iters, "iterations"
-    write (*, '(1x,a,e10.3)') "* Time step size: ", dt
+    write (*, '(1x, a, e10.3)') "* Time step size: ", dt
     print *, "******************************************************************************"
     print *, "* MESH SIZE"
     if (cps /= huge(0)) then
       print *, "* Cells per side: ", cps
-      write (*, '(1x,a,e10.3)') "* Domain size: ", domain_size
+      write (*, '(1x, a, e10.3)') "* Domain size: ", domain_size
     end if
     print *, "* Global number of cells is ", global_num_cells
     print *, "******************************************************************************"
     print *, "* RELAXATION FACTORS"
-    write (*, '(1x,a,e10.3)') "* velocity: ", velocity_relax
-    write (*, '(1x,a,e10.3)') "* pressure: ", pressure_relax
+    write (*, '(1x, a, e10.3)') "* velocity: ", velocity_relax
+    write (*, '(1x, a, e10.3)') "* pressure: ", pressure_relax
     print *, "******************************************************************************"
 
   end subroutine
@@ -443,27 +442,27 @@ contains
     use vec, only: get_vector_data, restore_vector_data, create_vector_values
 
     ! Arguments
-    type(fluid), intent(inout) :: flow_fields
+    type(fluid), intent(inout):: flow_fields
     
     ! Local variables
-    class(field), pointer :: u, v, w, p
-    class(field), pointer :: mf, mu, rho
+    class(field), pointer:: u, v, w, p
+    class(field), pointer:: mf, mu, rho
     
-    integer(ccs_int) :: n, count
-    integer(ccs_int) :: n_local
-    integer(ccs_int) :: index_p, global_index_p, index_f, index_nb
-    real(ccs_real) :: u_val, v_val, w_val, p_val
-    type(cell_locator) :: loc_p
-    type(face_locator) :: loc_f
-    type(neighbour_locator) :: loc_nb
-    type(vector_values) :: u_vals, v_vals, w_vals, p_vals
-    real(ccs_real), dimension(:), pointer :: mf_data, viscosity_data, density_data
+    integer(ccs_int):: n, count
+    integer(ccs_int):: n_local
+    integer(ccs_int):: index_p, global_index_p, index_f, index_nb
+    real(ccs_real):: u_val, v_val, w_val, p_val
+    type(cell_locator):: loc_p
+    type(face_locator):: loc_f
+    type(neighbour_locator):: loc_nb
+    type(vector_values):: u_vals, v_vals, w_vals, p_vals
+    real(ccs_real), dimension(:), pointer:: mf_data, viscosity_data, density_data
 
-    real(ccs_real), dimension(ndim) :: x_p, x_f
-    real(ccs_real), dimension(ndim) :: face_normal
+    real(ccs_real), dimension(ndim):: x_p, x_f
+    real(ccs_real), dimension(ndim):: face_normal
 
-    integer(ccs_int) :: nnb
-    integer(ccs_int) :: j
+    integer(ccs_int):: nnb
+    integer(ccs_int):: j
 
     ! Set alias
     call get_local_num_cells(n_local)
@@ -487,7 +486,7 @@ contains
       u_val = sin(x_p(1)) * cos(x_p(2)) * cos(x_p(3))
       v_val = -cos(x_p(1)) * sin(x_p(2)) * cos(x_p(3))
       w_val = 0.0_ccs_real
-      p_val = 0.0_ccs_real !-(sin(2 * x_p(1)) + sin(2 * x_p(2))) * 0.01_ccs_real / 4.0_ccs_real
+      p_val = 0.0_ccs_real  ! -(sin(2*x_p(1)) + sin(2*x_p(2))) * 0.01_ccs_real/4.0_ccs_real
 
       call set_row(global_index_p, u_vals)
       call set_entry(u_val, u_vals)
@@ -546,7 +545,7 @@ contains
         call get_local_index(loc_nb, index_nb)
 
         ! if neighbour index is greater than previous face index
-        if (index_nb > index_p) then ! XXX: abstract this test
+        if (index_nb > index_p) then  ! XXX: abstract this test
 
           call create_face_locator(index_p, j, loc_f)
           call get_local_index(loc_f, index_f)

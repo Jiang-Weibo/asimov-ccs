@@ -106,8 +106,8 @@ contains
       call error_abort("Unknown type")
     end select
 
-    if (allocated(io_err) .and. present(required)) then
-      if (required) then
+    if (present(required)) then
+      if (allocated(io_err) .and. required) then
         call error_abort("Error reading " // keyword // ". Possibly missing keyword in yaml file.")
       end if
     end if
