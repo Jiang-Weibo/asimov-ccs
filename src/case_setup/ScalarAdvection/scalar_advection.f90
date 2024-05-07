@@ -34,7 +34,8 @@ program scalar_advection
                       read_command_line_arguments, is_root
   use fv, only: compute_fluxes, update_gradient
   use io_visualisation, only: write_solution
-  use read_config, only: get_variables, get_boundary_count, get_case_name, get_enable_cell_corrections, get_variable_types
+  use read_config, only: get_variables, get_boundary_count, get_boundary_names, get_case_name, &
+                         get_enable_cell_corrections, get_variable_types
   use boundary_conditions, only: read_bc_config, allocate_bc_arrays
   use timers, only: timer_init, timer_register_start, timer_register, timer_start, timer_stop, timer_print, timer_get_time, timer_print_all
 
@@ -73,6 +74,8 @@ program scalar_advection
 
   type(fluid) :: flow_fields
 
+  character(len=128), dimension(:), allocatable :: bnd_names
+
   call initialise_parallel_environment(par_env)
   use_mpi_splitting = .false.
   call create_new_par_env(par_env, ccs_split_type_low_high, use_mpi_splitting, shared_env)
@@ -107,7 +110,8 @@ program scalar_advection
 
   ! Set up the square mesh
   if (irank == par_env%root) print *, "Building mesh"
-  mesh = build_square_mesh(par_env, shared_env, cps, 1.0_ccs_real)
+  call get_boundary_names(ccs_config_file, bnd_names)
+  mesh = build_square_mesh(par_env, shared_env, cps, 1.0_ccs_real, bnd_names)
   call set_mesh_object(mesh)
 
   ! Initialise fields

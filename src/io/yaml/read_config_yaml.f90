@@ -106,14 +106,14 @@ contains
       call error_abort("Unknown type")
     end select
 
-    if ((allocated(io_err) .eqv. .true.) .and. present(required)) then
-      if (required .eqv. .true.) then
+    if (present(required)) then
+      if (allocated(io_err) .and. required) then
         call error_abort("Error reading " // keyword // ". Possibly missing keyword in yaml file.")
       end if
     end if
   end subroutine
 
-module subroutine get_logical_value(dict, keyword, logical_val, value_present, required)
+  module subroutine get_logical_value(dict, keyword, logical_val, value_present, required)
     class(*), pointer, intent(in) :: dict                       !< The dictionary
     character(len=*), intent(in) :: keyword                     !< The key
     logical, intent(inout) :: logical_val                         !< The corresponding value
@@ -663,6 +663,55 @@ module subroutine get_logical_value(dict, keyword, logical_val, value_present, r
     end select
   end subroutine get_boundary_count
 
+  module subroutine get_boundary_names(filename, bnd_names)
+    character(len=*), intent(in) :: filename
+    character(len=128), dimension(:), allocatable, intent(out) :: bnd_names
+
+    integer :: n_boundaries
+
+    class(*), pointer :: config_file
+    class(*), pointer :: dict, dict2
+    character(:), allocatable :: error
+    type(type_error), allocatable :: io_err
+
+    integer :: i
+    
+    character(len=25) :: boundary_entry
+    character(len=:), allocatable :: tmpstr
+    
+    call get_boundary_count(filename, n_boundaries)
+    allocate(bnd_names(n_boundaries))
+
+    config_file => parse(filename, error)
+    if (allocated(error)) then
+      call error_abort(trim(error))
+    end if
+
+    select type (config_file)
+    type is (type_dictionary)
+      dict => config_file%get_dictionary("boundaries", required=.true., error=io_err)
+      !call error_handler(io_err)
+
+      do i = 1, n_boundaries
+        write(boundary_entry, '(A, I0)') "boundary_", i
+        select type(dict)
+        type is(type_dictionary)
+          dict2 => dict%get_dictionary(boundary_entry, required=.true., error=io_err)
+          !call error_handler(io_err)
+          
+          call get_value(dict2, "name", tmpstr)
+          bnd_names(i) = trim(tmpstr)
+        class default
+          call error_abort("type unhandled")
+        end select
+      end do
+    class default
+      call error_abort("type unhandled")
+    end select
+
+    
+  end subroutine get_boundary_names
+    
   module subroutine get_store_residuals(filename, store_residuals)
     character(len=*), intent(in) :: filename
     logical, intent(out) :: store_residuals

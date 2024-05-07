@@ -3,6 +3,7 @@ program test_compute_fluxes
 #include "ccs_macros.inc"
 
   use testing_lib
+  use ccs_base, only: bnd_names_default
   use types, only: field, central_field, face_field, matrix_values_spec
   use mesh_utils, only: build_square_mesh
   use fv, only: calc_advection_coeff
@@ -33,7 +34,8 @@ program test_compute_fluxes
 
   call init()
 
-  mesh = build_square_mesh(par_env, shared_env, cps, 1.0_ccs_real)
+  mesh = build_square_mesh(par_env, shared_env, cps, 1.0_ccs_real, &
+       bnd_names_default(1:4))
   call set_mesh_object(mesh)
 
   allocate (central_field :: scalar)

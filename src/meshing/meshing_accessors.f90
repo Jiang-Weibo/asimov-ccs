@@ -765,4 +765,30 @@ contains
     mesh%is_generated = is_generated
   end subroutine
 
+  !> Get the numerical ID of a boundary from its name
+  pure module subroutine get_bc_id(mesh, name, bc_id)
+    type(ccs_mesh), intent(in) :: mesh     !< The mesh
+    character(len=*), intent(in) :: name   !< The boundary name
+    integer(ccs_int), intent(out) :: bc_id !< The boundary ID
+
+    integer(ccs_int) :: nbc
+    logical :: found
+
+    found = .false.
+    nbc = size(mesh%bnd_names)
+
+    do bc_id = 1, nbc
+      if (trim(name) == trim(mesh%bnd_names(bc_id))) then
+        found = .true.
+        exit
+      end if
+    end do
+
+    if (.not.found) then
+      ! Failed to find BC by name
+      error stop unknown_bc_name
+    end if
+    
+  end subroutine get_bc_id
+
 end submodule meshing_accessors

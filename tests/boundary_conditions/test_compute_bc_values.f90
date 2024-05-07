@@ -1,6 +1,7 @@
 program test_compute_bc_values
 #include "ccs_macros.inc"
 
+  use ccs_base, only: bnd_names_default
   use testing_lib
   use kinds, only: ccs_real, ccs_int
   use types, only: field, central_field, face_locator, cell_locator, neighbour_locator, vector_spec
@@ -31,7 +32,8 @@ program test_compute_bc_values
 
   call init()
 
-  mesh = build_square_mesh(par_env, shared_env, cps, 1.0_ccs_real)
+  mesh = build_square_mesh(par_env, shared_env, cps, 1.0_ccs_real, &
+       bnd_names_default(1:4))
   call set_mesh_object(mesh)
 
   ! set locations

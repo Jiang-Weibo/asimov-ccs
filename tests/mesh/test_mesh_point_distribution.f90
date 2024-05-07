@@ -5,6 +5,7 @@
 program test_mesh_point_distribution
 
   use testing_lib
+  use ccs_base, only: bnd_names_default
   use mesh_utils, only: build_mesh
   use meshing, only: get_local_num_cells, get_global_num_cells
   use meshing, only: set_mesh_object, nullify_mesh_object
@@ -23,7 +24,8 @@ program test_mesh_point_distribution
   ny = 4
   nz = 4
 
-  mesh = build_mesh(par_env, shared_env, nx, ny, nz, 1.0_ccs_real)
+  mesh = build_mesh(par_env, shared_env, nx, ny, nz, 1.0_ccs_real, &
+       bnd_names_default)
   call set_mesh_object(mesh)
 
   call get_local_num_cells(nlocal)

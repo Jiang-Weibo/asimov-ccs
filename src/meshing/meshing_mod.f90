@@ -49,7 +49,8 @@ module meshing
   public :: get_face_interpolation
   public :: set_face_interpolation
   public :: get_mesh_generated, set_mesh_generated
-
+  public :: get_bc_id
+  
   interface get_centre
     module procedure get_cell_centre
     module procedure get_neighbour_centre
@@ -517,6 +518,13 @@ module meshing
     module subroutine set_mesh_generated(is_generated)
       logical, intent(in) :: is_generated
     end subroutine
+
+    !> Get the numerical ID of a boundary from its name
+    pure module subroutine get_bc_id(mesh, name, bc_id)
+      type(ccs_mesh), intent(in) :: mesh     !< The mesh
+      character(len=*), intent(in) :: name   !< The boundary name
+      integer(ccs_int), intent(out) :: bc_id !< The boundary ID
+    end subroutine get_bc_id
 
   end interface
 
