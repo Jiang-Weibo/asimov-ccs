@@ -420,6 +420,9 @@ contains
     call dprint("compute viscous souce term")
     ! call calculate_momentum_viscous_source(flow, component, vec)
 
+    ! Add source terms
+    call get_momentum_sources(component, workvec, M, vec)
+
     ! Underrelax the equations
     call dprint("GV: underrelax u")
     call underrelax(velocity_relax, u, workvec, M, vec)
@@ -510,6 +513,26 @@ contains
     call restore_vector_data_readonly(p_gradients, p_gradient_data)
 
   end subroutine calculate_momentum_pressure_source
+
+  subroutine get_momentum_sources(component, workvec, M, rhs)
+
+    use fv, only: add_fixed_source, add_linear_source
+    
+    integer(ccs_int), intent(in) :: component   !< Momentum direction
+    class(ccs_vector), intent(inout) :: workvec !< Working space (for sources)
+    class(ccs_matrix), intent(inout) :: M       !< System matrix
+    class(ccs_vector), intent(inout) :: rhs     !< RHS vector
+
+    associate(foo => component)
+    end associate
+
+    ! TODO: call user-defined sources
+    call zero(workvec)
+    call add_fixed_source(workvec, rhs)
+    call zero(workvec)
+    call add_linear_source(workvec, M)
+    
+  end subroutine get_momentum_sources
 
   !v Adds the momentum source due to variation in viscosity
   subroutine calculate_momentum_viscous_source(flow, component, vec)

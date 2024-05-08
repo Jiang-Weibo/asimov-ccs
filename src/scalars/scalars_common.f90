@@ -134,6 +134,8 @@ contains
     call compute_fluxes(phi, mf, viscosity, density, 0, M, rhs)
     call apply_timestep(phi, D, M, rhs)
 
+    call apply_sources(phi, D, M, rhs)
+
     call dprint("SCALAR: assemble linear system")
     call update(M)
     call update(rhs)
@@ -168,16 +170,37 @@ contains
   !> Get the name of the i'th field
   subroutine get_field_name(flow, s, field_name)
 
-   type(fluid), intent(in) :: flow                          !< The flowfield
-   integer(ccs_int), intent(in) :: s                        !< The field counter
-   character(len=:), allocatable, intent(out) :: field_name !< The field name
+    type(fluid), intent(in) :: flow                          !< The flowfield
+    integer(ccs_int), intent(in) :: s                        !< The field counter
+    character(len=:), allocatable, intent(out) :: field_name !< The field name
 
-   class(field), pointer :: phi
+    class(field), pointer :: phi
    
-   call get_field(flow, s, phi)
-   field_name = phi%name
-   nullify(phi)
+    call get_field(flow, s, phi)
+    field_name = phi%name
+    nullify(phi)
 
- end subroutine get_field_name
+  end subroutine get_field_name
+ 
+  !> Compute source terms and add to the equation system
+  subroutine apply_sources(phi, D, M, rhs)
+
+    use fv, only: add_fixed_source, add_linear_source
+    
+    class(field), intent(in) :: phi !< The transported field
+    class(ccs_vector), intent(inout) :: D   !< Work vector (for evaluating sources)
+    class(ccs_matrix), intent(inout) :: M   !< The equation system/matrix
+    class(ccs_vector), intent(inout) :: rhs !< The equation system/RHS vector
+
+    ! TODO: add user-defined + model-specific sources (phi%name will allow determining which field)
+    associate(foo => phi)
+    end associate
+    
+    call zero(D)
+    call add_fixed_source(D, rhs)
+    call zero(D)
+    call add_linear_source(D, M)
+    
+  end subroutine apply_sources
   
 end submodule scalars_common

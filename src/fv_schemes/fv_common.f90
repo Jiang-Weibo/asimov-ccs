@@ -862,7 +862,7 @@ contains
   !> Adds a fixed source term to the righthand side of the equation
   module subroutine add_fixed_source(S, rhs)
 
-    class(ccs_vector), intent(inout) :: S      !< The source field
+    class(ccs_vector), intent(inout) :: S   !< The source field
     class(ccs_vector), intent(inout) :: rhs !< The righthand side vector
 
     real(ccs_real), dimension(:), pointer :: S_data
