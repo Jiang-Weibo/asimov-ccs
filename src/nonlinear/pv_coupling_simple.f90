@@ -73,6 +73,7 @@ contains
     class(ccs_matrix), allocatable :: M
     class(ccs_vector), allocatable :: invA    ! Inverse diagonal coefficient
     class(ccs_vector), allocatable :: workvec ! Temporary workspace vector 
+    class(ccs_vector), allocatable :: sourcevec
     class(ccs_vector), allocatable :: res
     real(ccs_real), dimension(:), allocatable :: residuals
     integer(ccs_int) :: max_faces ! The maximum number of faces per cell
@@ -155,6 +156,7 @@ contains
     ! Create workspace vector
     call dprint("NONLINEAR: setup workspace")
     call create_vector(vec_properties, workvec)
+    call create_vector(vec_properties, sourcevec)
 
     ! Create vectors for storing residuals
     call dprint("NONLINEAR: setup residuals")
@@ -178,8 +180,8 @@ contains
 
       ! Solve momentum equation with guessed pressure and velocity fields (eq. 4)
       call dprint("NONLINEAR: guess velocity")
-      call calculate_velocity(par_env, flow, ivar, M, source, &
-                              lin_system, invA, workvec, res, residuals)
+      call calculate_velocity(par_env, flow, eval_sources, ivar, M, source, &
+                              lin_system, invA, workvec, sourcevec, res, residuals)
 
       ! Calculate pressure correction from mass imbalance (sub. eq. 11 into eq. 8)
       call dprint("NONLINEAR: mass imbalance")
@@ -248,18 +250,28 @@ contains
   !  Given an initial guess of a pressure field form the momentum equations (as scalar
   !  equations) and solve to obtain an intermediate velocity field u* that will not
   !  satisfy continuity.
-  subroutine calculate_velocity(par_env, flow, ivar, M, vec, &
-                                lin_sys, invA, workvec, res, residuals)
+  subroutine calculate_velocity(par_env, flow, eval_sources, ivar, M, vec, &
+                                lin_sys, invA, workvec, sourcevec, res, residuals)
 
     ! Arguments
     class(parallel_environment), allocatable, intent(in) :: par_env !< the parallel environment
     type(fluid), intent(inout) :: flow                   !< Container for flow fields
+    interface
+      subroutine eval_sources(flow, phi, R, S)
+        use types, only: fluid, field, ccs_vector
+        type(fluid), intent(in) :: flow !< Provides access to full flow field
+        class(field), intent(in) :: phi !< Field being transported
+        class(ccs_vector), intent(inout) :: R !< Work vector (for evaluating linear/implicit sources)
+        class(ccs_vector), intent(inout) :: S !< Work vector (for evaluating fixed/explicit sources)
+      end subroutine eval_sources
+    end interface
     integer(ccs_int), intent(inout) :: ivar              !< flow variable counter
     class(ccs_matrix), allocatable, intent(inout) :: M   !< matrix object
     class(ccs_vector), allocatable, intent(inout) :: vec !< vector object
     type(equation_system), intent(inout) :: lin_sys      !< linear system object
     class(ccs_vector), intent(inout) :: invA             !< vector containing the inverse momentum coefficients
     class(ccs_vector), intent(inout) :: workvec          !< vector for work space
+    class(ccs_vector), intent(inout) :: sourcevec          !< vector for work space
     class(ccs_vector), intent(inout) :: res              !< residual field
     real(ccs_real), dimension(:), intent(inout) :: residuals !< RMS and L-inf of residuals for each flow variable
 
@@ -312,8 +324,8 @@ contains
     ! ----------
     if (u_sol) then
       call zero_vector(invAu)
-      call calculate_velocity_component(flow, par_env, varu, p, 1, M, vec, lin_sys, u, invAu, &
-           workvec, res, residuals)
+      call calculate_velocity_component(flow, par_env, eval_sources, varu, p, 1, M, vec, lin_sys, u, invAu, &
+           workvec, sourcevec, res, residuals)
       call axpy(1.0_ccs_real, invAu, invA)
       call vec_reciprocal(invAu)
       dim = dim + 1.0_ccs_real
@@ -323,8 +335,8 @@ contains
     ! ----------
     if (v_sol) then
       call zero_vector(invAv)
-      call calculate_velocity_component(flow, par_env, varv, p, 2, M, vec, lin_sys, v, invAv, &
-                                        workvec, res, residuals)
+      call calculate_velocity_component(flow, par_env, eval_sources, varv, p, 2, M, vec, lin_sys, v, invAv, &
+           workvec, sourcevec, res, residuals)
       call axpy(1.0_ccs_real, invAv, invA)
       call vec_reciprocal(invAv)
       dim = dim + 1.0_ccs_real
@@ -334,8 +346,8 @@ contains
     ! ----------
     if (w_sol) then
       call zero_vector(invAw)
-      call calculate_velocity_component(flow, par_env, varw, p, 3, M, vec, lin_sys, w, invAw, &
-                                        workvec, res, residuals)
+      call calculate_velocity_component(flow, par_env, eval_sources, varw, p, 3, M, vec, lin_sys, w, invAw, &
+           workvec, sourcevec, res, residuals)
       call axpy(1.0_ccs_real, invAw, invA)
       call vec_reciprocal(invAw)
       dim = dim + 1.0_ccs_real
@@ -348,8 +360,8 @@ contains
 
   end subroutine calculate_velocity
 
-  subroutine calculate_velocity_component(flow, par_env, ivar, p, component, M, vec, &
-                                          lin_sys, u, invA, workvec, input_res, residuals)
+  subroutine calculate_velocity_component(flow, par_env, eval_sources, ivar, p, component, M, vec, &
+                                          lin_sys, u, invA, workvec, sourcevec, input_res, residuals)
 
     use case_config, only: velocity_relax
     use timestepping, only: apply_timestep
@@ -358,6 +370,15 @@ contains
     ! Arguments
     type(fluid), intent(inout) :: flow                   !< Container for flow fields
     class(parallel_environment), allocatable, intent(in) :: par_env
+    interface
+      subroutine eval_sources(flow, phi, R, S)
+        use types, only: fluid, field, ccs_vector
+        type(fluid), intent(in) :: flow !< Provides access to full flow field
+        class(field), intent(in) :: phi !< Field being transported
+        class(ccs_vector), intent(inout) :: R !< Work vector (for evaluating linear/implicit sources)
+        class(ccs_vector), intent(inout) :: S !< Work vector (for evaluating fixed/explicit sources)
+      end subroutine eval_sources
+    end interface
     integer(ccs_int), intent(in) :: ivar
     class(field), pointer :: mf
     class(field), pointer :: viscosity
@@ -370,6 +391,7 @@ contains
     class(field), target, intent(inout) :: u
     class(ccs_vector), intent(inout) :: invA
     class(ccs_vector), intent(inout) :: workvec
+    class(ccs_vector), intent(inout) :: sourcevec
     class(ccs_vector), target, intent(inout) :: input_res
     class(ccs_vector), pointer :: res
     real(ccs_real), dimension(:), intent(inout) :: residuals
@@ -430,7 +452,7 @@ contains
     ! call calculate_momentum_viscous_source(flow, component, vec)
 
     ! Add source terms
-    call get_momentum_sources(component, workvec, M, vec)
+    call get_momentum_sources(flow, u, eval_sources, workvec, sourcevec, M, vec)
 
     ! Underrelax the equations
     call dprint("GV: underrelax u")
@@ -523,23 +545,32 @@ contains
 
   end subroutine calculate_momentum_pressure_source
 
-  subroutine get_momentum_sources(component, workvec, M, rhs)
+  subroutine get_momentum_sources(flow, u, eval_sources, R, S, M, rhs)
 
     use fv, only: add_fixed_source, add_linear_source
     
-    integer(ccs_int), intent(in) :: component   !< Momentum direction
-    class(ccs_vector), intent(inout) :: workvec !< Working space (for sources)
+    type(fluid), intent(in) :: flow
+    class(field), intent(in) :: u
+    interface
+      subroutine eval_sources(flow, phi, R, S)
+        use types, only: fluid, field, ccs_vector
+        type(fluid), intent(in) :: flow !< Provides access to full flow field
+        class(field), intent(in) :: phi !< Field being transported
+        class(ccs_vector), intent(inout) :: R !< Work vector (for evaluating linear/implicit sources)
+        class(ccs_vector), intent(inout) :: S !< Work vector (for evaluating fixed/explicit sources)
+      end subroutine eval_sources
+    end interface
+    class(ccs_vector), intent(inout) :: R
+    class(ccs_vector), intent(inout) :: S
     class(ccs_matrix), intent(inout) :: M       !< System matrix
     class(ccs_vector), intent(inout) :: rhs     !< RHS vector
 
-    associate(foo => component)
-    end associate
-
-    ! TODO: call user-defined sources
-    call zero(workvec)
-    call add_fixed_source(workvec, rhs)
-    call zero(workvec)
-    call add_linear_source(workvec, M)
+    call eval_sources(flow, u, R, S)
+    ! TODO: Insert model-specific sources here
+    ! @note Model-specific source subroutines should be additive to avoid overwriting user-defined
+    !       sources.
+    call add_fixed_source(S, rhs)
+    call add_linear_source(R, M)
     
   end subroutine get_momentum_sources
 
