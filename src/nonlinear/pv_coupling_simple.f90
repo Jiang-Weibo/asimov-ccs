@@ -46,12 +46,21 @@ submodule(pv_coupling) pv_coupling_simple
 contains
 
   !> Solve Navier-Stokes equations using the SIMPLE algorithm
-  module subroutine solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
+  module subroutine solve_nonlinear(par_env, mesh, eval_sources, it_start, it_end, res_target, &
                                     flow, diverged)
 
     ! Arguments
     class(parallel_environment), allocatable, intent(in) :: par_env   !< parallel environment
     type(ccs_mesh), intent(in) :: mesh                                !< the mesh
+    interface
+      subroutine eval_sources(flow, phi, R, S)
+        use types, only: fluid, field, ccs_vector
+        type(fluid), intent(in) :: flow !< Provides access to full flow field
+        class(field), intent(in) :: phi !< Field being transported
+        class(ccs_vector), intent(inout) :: R !< Work vector (for evaluating linear/implicit sources)
+        class(ccs_vector), intent(inout) :: S !< Work vector (for evaluating fixed/explicit sources)
+      end subroutine eval_sources
+    end interface
     integer(ccs_int), intent(in) :: it_start
     integer(ccs_int), intent(in) :: it_end
     real(ccs_real), intent(in) :: res_target                          !< Target residual
@@ -193,7 +202,7 @@ contains
       ! Transport scalars
       ! XXX: Should we distinguish active scalars (update in non-linear loop) and passive scalars
       !      (single update per timestep)?
-      call update_scalars(par_env, mesh, flow)
+      call update_scalars(par_env, mesh, eval_sources, flow)
 
       !< density values change to exponential here after update
 

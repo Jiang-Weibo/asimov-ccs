@@ -20,6 +20,8 @@ submodule(scalars) scalars_common
   use meshing, only: get_max_faces
   use utils, only: get_field, update, initialise, finalise, set_size, debug_print, &
        zero
+
+  implicit none
   
   logical, save :: first_call = .true.
   integer(ccs_int), save :: previous_step = -1
@@ -33,14 +35,24 @@ submodule(scalars) scalars_common
 contains
   
   !> Subroutine to perform scalar transport for all scalar fields.
-  module subroutine update_scalars(par_env, mesh, flow)
+  module subroutine update_scalars(par_env, mesh, eval_sources, flow)
     class(parallel_environment), allocatable, intent(in) :: par_env !< parallel environment
     type(ccs_mesh), intent(in) :: mesh                              !< the mesh
+    interface
+      subroutine eval_sources(flow, phi, R, S)
+        use types, only: fluid, field, ccs_vector
+        type(fluid), intent(in) :: flow !< Provides access to full flow field
+        class(field), intent(in) :: phi !< Field being transported
+        class(ccs_vector), intent(inout) :: R !< Work vector (for evaluating linear/implicit sources)
+        class(ccs_vector), intent(inout) :: S !< Work vector (for evaluating fixed/explicit sources)
+      end subroutine eval_sources
+    end interface
     type(fluid), intent(inout) :: flow                              !< The structure containting all the fluid fields
 
     class(ccs_matrix), allocatable :: M
     class(ccs_vector), allocatable :: rhs
     class(ccs_vector), allocatable :: D
+    class(ccs_vector), allocatable :: source
     
     integer(ccs_int) :: nfields  ! Number of variables in the flowfield
     integer(ccs_int) :: s        ! Scalar field counter
@@ -70,6 +82,7 @@ contains
     call set_size(par_env, mesh, vec_properties)
     call create_vector(vec_properties, rhs)
     call create_vector(vec_properties, D)
+    call create_vector(vec_properties, source)
 
     ! Check whether we need to update the old values
     call dprint("SCALAR: check new timestep")
@@ -101,19 +114,29 @@ contains
           call update_old_values(phi)
        end if
 
-       call transport_scalar(par_env, flow, M, rhs, D, phi)
+       call transport_scalar(par_env, flow, eval_sources, M, rhs, D, source, phi)
     end do
     
   end subroutine update_scalars
 
   !> Subroutine to transport a scalar field.
-  subroutine transport_scalar(par_env, flow, M, rhs, D, phi)
+  subroutine transport_scalar(par_env, flow, eval_sources, M, rhs, D, S, phi)
 
     class(parallel_environment), allocatable, intent(in) :: par_env !< parallel environment
     type(fluid), intent(inout) :: flow                              !< The structure containting all the fluid fields
+    interface
+      subroutine eval_sources(flow, phi, R, S)
+        use types, only: fluid, field, ccs_vector
+        type(fluid), intent(in) :: flow !< Provides access to full flow field
+        class(field), intent(in) :: phi !< Field being transported
+        class(ccs_vector), intent(inout) :: R !< Work vector (for evaluating linear/implicit sources)
+        class(ccs_vector), intent(inout) :: S !< Work vector (for evaluating fixed/explicit sources)
+      end subroutine eval_sources
+    end interface
     class(ccs_matrix), allocatable, intent(inout) :: M
     class(ccs_vector), allocatable, intent(inout) :: rhs
-    class(ccs_vector), intent(inout) :: D
+    class(ccs_vector), intent(inout) :: D !< Working vector for equation diagonal
+    class(ccs_vector), intent(inout) :: S !< Working vector for equation RHS
     class(field), intent(inout) :: phi ! The scalar field
 
     class(field), pointer :: mf  ! The advecting velocity field
@@ -134,7 +157,7 @@ contains
     call compute_fluxes(phi, mf, viscosity, density, 0, M, rhs)
     call apply_timestep(phi, D, M, rhs)
 
-    call apply_sources(phi, D, M, rhs)
+    call apply_sources(flow, phi, eval_sources, D, S, M, rhs)
 
     call dprint("SCALAR: assemble linear system")
     call update(M)
@@ -183,23 +206,32 @@ contains
   end subroutine get_field_name
  
   !> Compute source terms and add to the equation system
-  subroutine apply_sources(phi, D, M, rhs)
+  subroutine apply_sources(flow, phi, eval_sources, R, S, M, rhs)
 
     use fv, only: add_fixed_source, add_linear_source
     
+    type(fluid), intent(in) :: flow !< Provides access to full flow field
     class(field), intent(in) :: phi !< The transported field
-    class(ccs_vector), intent(inout) :: D   !< Work vector (for evaluating sources)
+    interface
+      subroutine eval_sources(flow, phi, R, S)
+        use types, only: fluid, field, ccs_vector
+        type(fluid), intent(in) :: flow !< Provides access to full flow field
+        class(field), intent(in) :: phi !< Field being transported
+        class(ccs_vector), intent(inout) :: R !< Work vector (for evaluating linear/implicit sources)
+        class(ccs_vector), intent(inout) :: S !< Work vector (for evaluating fixed/explicit sources)
+      end subroutine eval_sources
+    end interface
+    class(ccs_vector), intent(inout) :: R   !< Work vector (for evaluating linear/implicit sources)
+    class(ccs_vector), intent(inout) :: S   !< Work vector (for evaluating fixed/explicit sources)
     class(ccs_matrix), intent(inout) :: M   !< The equation system/matrix
     class(ccs_vector), intent(inout) :: rhs !< The equation system/RHS vector
-
-    ! TODO: add user-defined + model-specific sources (phi%name will allow determining which field)
-    associate(foo => phi)
-    end associate
     
-    call zero(D)
-    call add_fixed_source(D, rhs)
-    call zero(D)
-    call add_linear_source(D, M)
+    call eval_sources(flow, phi, R, S)
+    ! TODO: Insert model-specific sources here
+    ! @note Model-specific source subroutines should be additive to avoid overwriting user-defined
+    !       sources.
+    call add_fixed_source(S, rhs)
+    call add_linear_source(R, M)
     
   end subroutine apply_sources
   

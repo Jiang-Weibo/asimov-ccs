@@ -265,7 +265,7 @@ program tgv
 
   do t = 1, num_steps
     call timer_start(timer_index_sol)
-    call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
+    call solve_nonlinear(par_env, mesh, eval_sources, it_start, it_end, res_target, &
                          flow_fields)
 
     call get_field(flow_fields, "u", u)
@@ -582,5 +582,41 @@ contains
     nullify(rho)
 
   end subroutine initialise_flow
+
+  !> Case-specific source terms
+  subroutine eval_sources(flow, phi, R, S)
+    use types, only: fluid, field, ccs_vector
+    use vec, only: get_vector_data, restore_vector_data
+    use meshing, only: get_local_num_cells
+
+    type(fluid), intent(in) :: flow !< Provides access to full flow field
+    class(field), intent(in) :: phi !< Field being transported
+    class(ccs_vector), intent(inout) :: R !< Work vector (for evaluating linear/implicit sources)
+    class(ccs_vector), intent(inout) :: S !< Work vector (for evaluating fixed/explicit sources)
+
+    real(ccs_real), dimension(:), pointer:: R_data, S_data
+    integer(ccs_int) :: local_num_cells
+
+    integer :: i
+
+    associate(foo => flow, bar => phi)
+    end associate
+
+    call get_vector_data(R, R_data)
+    call get_vector_data(S, S_data)
+
+    call get_local_num_cells(local_num_cells)
+    do i = 1, local_num_cells
+      ! XXX: Dummy implementation, use flow/phi to compute field-specific sources
+      R_data(i) = 0
+      S_data(i) = 0
+    end do
+
+    call restore_vector_data(R, R_data)
+    call restore_vector_data(S, S_data)
+    call update(R)
+    call update(S)
+    
+  end subroutine eval_sources
 
 end program tgv
