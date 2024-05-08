@@ -873,6 +873,9 @@ contains
     type(cell_locator) :: loc_p
     real(ccs_real) :: V_p
     
+    ! Ensure RHS is in "clean" state
+    call update(rhs)
+    
     call get_vector_data_readonly(S, S_data)
     call get_vector_data(rhs, rhs_data)
     call get_local_num_cells(local_num_cells)
