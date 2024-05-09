@@ -141,6 +141,7 @@ contains
         print*, "data_name=",data_name," sel_start=",sel_start," sel_count=",sel_count
 
         call read_array(sol_reader, data_name, sel_start, sel_count, data, steps)
+        !re-ordering here. 
 
         call get_vector_data(phi%values, output_data)
         output_data = data

@@ -205,7 +205,7 @@ program ldc
   nullify(viscosity)
   nullify(density)
 
-  !call read_solution(par_env, case_path, mesh, flow_fields)
+  call read_solution(par_env, case_path, mesh, flow_fields)
   !call get_field(flow_fields, "u", u) 
   !call get_vector_data(u%values, output_data)
   

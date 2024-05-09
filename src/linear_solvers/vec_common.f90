@@ -4,6 +4,8 @@ submodule(vec) vec_common
   use utils, only: exit_print, str
   use constants, only: cell
   use error_codes
+  use meshing, only: get_global_num_cells, get_global_index
+  use types, only: cell_locator
   implicit none
 
 contains
@@ -72,7 +74,7 @@ contains
   end subroutine set_vector_values_entry
 
   !> Generic implementation to get vector data in natural ordering
-  module subroutine get_natural_data_vec(par_env, mesh, v, data)
+  module subroutine get_natural_data_vec(par_env, mesh, v, data) !global to natural
 
     class(parallel_environment), intent(in) :: par_env
     type(ccs_mesh), intent(in) :: mesh
@@ -101,5 +103,46 @@ contains
     end associate
 
   end subroutine get_natural_data_vec
+
+  !> Generic implementation to get vector data in global ordering
+  module subroutine get_global_data_vec(par_env, mesh, v, data) !natural to global
+
+    class(parallel_environment), intent(in) :: par_env
+    type(ccs_mesh), intent(in) :: mesh
+    class(ccs_vector), intent(inout) :: v
+    real(ccs_real), dimension(:), allocatable, intent(out) :: data !< The returned vector data in
+                                                                   !< natural ordering. Note the use
+                                                                   !< of allocatable + intent(out),
+                                                                   !< this ensures it will be
+                                                                   !< de/reallocated by this subroutine.
+    
+    real(ccs_real), dimension(:), pointer :: vec_data, nat_glob_data ! The data stored in the vector
+    integer(ccs_int) :: global_num_cells, global_index_p, i
+    type(cell_locator) :: loc_p
+
+    associate (topo => mesh%topo, &
+                local_num_cells => mesh%topo%local_num_cells)
+      
+      if (allocated(data)) then ! Shouldn't really happen...
+        deallocate(data)
+      end if
+      call get_global_num_cells(global_num_cells)
+
+      allocate(data(local_num_cells))
+      global_num_cells = 0
+      allocate(nat_glob_data(global_num_cells))
+
+      do i=1,local_num_cells
+        call get_global_index(loc_p, global_index_p)
+        nat_glob_data(i)=global_index_p
+      end do
+      ! DO mpi all reduce
+      MPI_Allreduce(MPI_SUM)
+
+    end associate
+    
+    
+
+  end subroutine get_global_data_vec
 
 end submodule
