@@ -2665,6 +2665,9 @@ contains
           ! v_p_nb.V2 / |v_p_nb|**2
           v_p_nb = x_nb - x_p
           interpol_factor = dot_product(v_p_nb, x_f - x_p) / dot_product(v_p_nb, v_p_nb)
+          if (interpol_factor > 1) then
+            call dprint("invalid interpol factor " // str(interpol_factor))
+          end if
 
           ! inverse interpol factor as it is relative to x_p
           ! the closer x_f is to x_p, the higher the interpol_factor

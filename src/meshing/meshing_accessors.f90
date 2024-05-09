@@ -416,6 +416,17 @@ contains
     end associate
   end subroutine set_area
 
+  !> Set the volume of specified cell
+  module subroutine set_volume(volume, loc_p)
+    real(ccs_real), intent(in) :: volume      !< The cell volume
+    type(cell_locator), intent(in) :: loc_p   !< The cell locator object
+
+    associate (cell => loc_p%index_p, &
+               offset => mesh%topo%shared_array_local_offset)   ! volumes arrays consist of only local cells, hence specify local offset
+      mesh%geo%volumes(cell+offset) = volume
+    end associate
+  end subroutine set_volume
+
   !> Returns the centre of a cell
   pure module subroutine get_cell_centre(loc_p, x)
     type(cell_locator), intent(in) :: loc_p           !< the cell locator object.
