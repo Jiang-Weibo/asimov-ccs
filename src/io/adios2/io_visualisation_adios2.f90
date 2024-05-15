@@ -34,6 +34,7 @@ contains
     use utils, only: get_natural_data
     use vec, only: get_vector_data, restore_vector_data
     use io, only: get_num_steps
+    use vec, only: get_global_data_vec
 
     ! Arguments
     class(parallel_environment), allocatable, target, intent(in) :: par_env  !< The parallel environment
@@ -61,6 +62,7 @@ contains
     integer(ccs_long), dimension(2) :: sel2_count
 
     real(ccs_real), dimension(:), allocatable, target :: data
+    real(ccs_real), dimension(:), allocatable :: re_order_data
 
     integer(ccs_int) :: timer_index_nat_data_output
     integer(ccs_int) :: timer_index_nat_data
@@ -141,17 +143,21 @@ contains
         print*, "data_name=",data_name," sel_start=",sel_start," sel_count=",sel_count
 
         call read_array(sol_reader, data_name, sel_start, sel_count, data, steps)
+        call get_vector_data (phi%values, output_data)
+        output_data = data
+        call restore_vector_data (phi%values, output_data)
+        call get_global_data_vec(par_env, mesh, phi%values, re_order_data)
         !re-ordering here. 
 
         call get_vector_data(phi%values, output_data)
-        output_data = data
+        output_data = re_order_data
 
         !call get_vector_data(output_list(i)%ptr%values, output_data)
         !output_data = data
 
         !do index_p = 1, n_local
         do index_p = 1, 9
-          print*, index_p, data(index_p)
+          print*, index_p, data(index_p), re_order_data(index_p)
         end do
 
 
