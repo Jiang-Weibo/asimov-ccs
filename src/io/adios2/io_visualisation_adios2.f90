@@ -30,7 +30,7 @@ contains
     use kinds, only: ccs_long
     use constants, only: ndim, adiosconfig
     use types, only: cell_locator
-    use meshing, only: get_global_num_cells, create_cell_locator, get_global_index, get_local_num_cells
+    use meshing, only: get_global_num_cells, create_cell_locator, get_global_index, get_natural_index, get_local_num_cells
     use utils, only: get_natural_data
     use vec, only: get_vector_data, restore_vector_data
     use io, only: get_num_steps
@@ -77,7 +77,7 @@ contains
     integer(ccs_int) :: index_global
 
     real(ccs_long), dimension(:), pointer :: output_data
-    integer(ccs_int) :: index_p
+    integer(ccs_int) :: index_p, n_local, global_index_p, natural_index_p
     class(field), pointer :: phi
 
     sol_file = case_name // '.sol.h5'
@@ -147,29 +147,26 @@ contains
         output_data = data
         call restore_vector_data (phi%values, output_data)
         call get_global_data_vec(par_env, mesh, phi%values, re_order_data)
-        !re-ordering here. 
+        ! re-ordering here. 
 
         call get_vector_data(phi%values, output_data)
         output_data = re_order_data
 
-        !call get_vector_data(output_list(i)%ptr%values, output_data)
-        !output_data = data
-
-        !do index_p = 1, n_local
-        do index_p = 1, 9
-          print*, index_p, data(index_p), re_order_data(index_p)
+        call get_local_num_cells(n_local)
+        do index_p = 1, n_local
+          call create_cell_locator(index_p, loc_p) 
+          call get_global_index(loc_p, global_index_p)
+          call get_natural_index(loc_p, natural_index_p)
+          print*, index_p, data(index_p), re_order_data(index_p), "global=", global_index_p, "nat=", natural_index_p
         end do
 
-
-        !call restore_vector_data(output_list(i)%ptr%values, output_data)
-        !call set_values(data, phi%values)
         call restore_vector_data(phi%values, output_data)
         call update(phi%values)
         
       end if 
       nullify(phi)
     end do
-
+    
     call timer_stop(timer_index_output)
 
     !call end_step(sol_reader)
