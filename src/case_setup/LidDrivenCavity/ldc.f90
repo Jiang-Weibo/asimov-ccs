@@ -12,7 +12,7 @@ program ldc
   use case_config, only: num_iters, cps, domain_size, case_name, &
                          velocity_relax, pressure_relax, res_target, &
                          write_gradients, velocity_solver_method_name, velocity_solver_precon_name, &
-                         pressure_solver_method_name, pressure_solver_precon_name
+                         pressure_solver_method_name, pressure_solver_precon_name, restart
   use constants, only: cell, face, ccsconfig, ccs_string_len, &
                        cell_centred_central, cell_centred_upwind, face_centred, &
                        ccs_split_type_shared, ccs_split_type_low_high
@@ -205,7 +205,12 @@ program ldc
   nullify(viscosity)
   nullify(density)
 
-  call read_solution(par_env, case_path, mesh, flow_fields)
+  if(restart == 'yes') then
+    print*, "restart capability activated"
+    call read_solution(par_env, case_path, mesh, flow_fields)
+  end if 
+
+  
   !call get_field(flow_fields, "u", u) 
   !call get_vector_data(u%values, output_data)
   
@@ -283,6 +288,16 @@ contains
     if (size(variable_types) /= size(variable_names)) then
        call error_abort("The number of variable types does not match the number of named variables")
     end if
+
+    call get_value(config_file, 'restart', restart)
+    if (restart == 'yes' .OR. restart == 'no') then
+    else 
+      call error_abort("Restart simulation not specified correctly")
+    end if
+
+    ! if (restart /= 'yes' .OR. restart /= 'no') then ! not working
+      ! call error_abort("Restart simulation not specified correctly")
+    ! end if
 
     call get_value(config_file, 'iterations', num_iters)
     if (num_iters == huge(0)) then
