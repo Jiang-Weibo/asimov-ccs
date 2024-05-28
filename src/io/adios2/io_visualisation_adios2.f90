@@ -81,9 +81,7 @@ contains
     class(field), pointer :: phi
 
     sol_file = case_name // '.sol.h5'
-    print*,"sol_file=",sol_file
     adios2_file = case_name // adiosconfig
-    print*, "adios2_file=", adios2_file
 
     call timer_register("Get natural data (output)", timer_index_nat_data_output)
     call timer_register("Get natural data (grads)", timer_index_nat_data)
@@ -140,8 +138,6 @@ contains
         call timer_stop(timer_index_nat_data_output)
         data_name = "/" // trim(phi%name)
 
-        print*, "data_name=",data_name," sel_start=",sel_start," sel_count=",sel_count
-
         call read_array(sol_reader, data_name, sel_start, sel_count, data, steps)
         call get_vector_data (phi%values, output_data)
         output_data = data
@@ -157,7 +153,6 @@ contains
           call create_cell_locator(index_p, loc_p) 
           call get_global_index(loc_p, global_index_p)
           call get_natural_index(loc_p, natural_index_p)
-          print*, index_p, data(index_p), re_order_data(index_p), "global=", global_index_p, "nat=", natural_index_p
         end do
 
         call restore_vector_data(phi%values, output_data)
@@ -248,9 +243,7 @@ contains
     class(field), pointer :: phi
     
     sol_file = case_name // '.sol.h5'
-    print*,"sol_file=",sol_file
     adios2_file = case_name // adiosconfig
-    print*, "adios2_file=", adios2_file
 
     call timer_register("Get natural data (output)", timer_index_nat_data_output)
     call timer_register("Get natural data (grads)", timer_index_nat_data)
