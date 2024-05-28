@@ -248,18 +248,6 @@ module poiseuille_core
     call timer_register_start("Solver time inc I/O", timer_index_sol)
 
     call read_solution(par_env, case_path, mesh, flow_fields)
-    call get_field(flow_fields, "u", u) 
-    call get_vector_data(u%values, output_data)
-    
-    call get_local_num_cells(n_local)
-    do index_p = 1, n_local
-      print*, index_p, output_data(index_p)
-    end do
-  
-    call restore_vector_data(u%values, output_data)
-    call update(u%values)
-    nullify(u)
-
 
     call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
                           flow_fields)
@@ -280,15 +268,6 @@ module poiseuille_core
     nullify(mf)
 
     call write_solution(par_env, case_path, mesh, flow_fields)
-
-    call get_vector_data(u%values, output_data)
-  
-    call get_local_num_cells(n_local)
-    do index_p = 1, n_local
-      print*, index_p, output_data(index_p)
-    end do
-  
-    call restore_vector_data(u%values, output_data)
 
     call timer_stop(timer_index_sol)
 
