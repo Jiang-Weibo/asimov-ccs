@@ -253,17 +253,6 @@ program sandia
   call timer_register("Solver time inc I/O", timer_index_sol)
 
   call read_solution(par_env, case_path, mesh, flow_fields)
-  !call get_field(flow_fields, "u", u) 
-  !call get_vector_data(u%values, output_data)
-  
-  !call get_local_num_cells(n_local)
-  !do index_p = 1, n_local
-    !print*, index_p, output_data(index_p)
-  !end do
-
-  !call restore_vector_data(u%values, output_data)
-  !call update(u%values)
-  !nullify(u)
 
   do t = 1, num_steps
     call timer_start(timer_index_sol)
