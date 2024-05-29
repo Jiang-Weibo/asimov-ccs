@@ -238,8 +238,6 @@ contains
     type(cell_locator) :: loc_p
     integer(ccs_int) :: index_global
 
-    real(ccs_real), dimension(:), pointer :: output_data
-    integer(ccs_int) :: index_p
     class(field), pointer :: phi
     
     sol_file = case_name // '.sol.h5'
