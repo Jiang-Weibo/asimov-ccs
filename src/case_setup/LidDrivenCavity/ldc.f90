@@ -201,7 +201,7 @@ program ldc
   nullify(viscosity)
   nullify(density)
 
-  if(restart == 'yes') then
+  if(restart) then
     print*, "restart capability activated"
     call read_solution(par_env, case_path, mesh, flow_fields)
   end if 
@@ -264,10 +264,6 @@ contains
     end if
 
     call get_value(config_file, 'restart', restart)
-    if (restart == 'yes' .OR. restart == 'no') then
-    else 
-      call error_abort("Restart simulation not specified correctly")
-    end if
 
     call get_value(config_file, 'iterations', num_iters)
     if (num_iters == huge(0)) then

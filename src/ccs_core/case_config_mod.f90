@@ -12,7 +12,7 @@ module case_config
   private
 
   ! Restart a simulation
-  character(len=:), allocatable, save, public :: restart
+  logical, save, public :: restart = .false.
 
   ! Number of timesteps and iterations
   integer(ccs_int), public :: num_steps = huge(0)
