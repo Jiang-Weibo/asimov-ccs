@@ -60,10 +60,6 @@ contains
     character(len=:), allocatable :: case_path  ! Path to input directory with case name appended
     character(len=:), allocatable :: ccs_config_file ! Config file for CCS
 
-    real(ccs_real), dimension(:), pointer :: output_data
-    integer(ccs_int) :: index_p
-    integer(ccs_int) :: n_local
-
     type(vector_spec) :: vec_properties
 
     type(field_spec) :: field_properties

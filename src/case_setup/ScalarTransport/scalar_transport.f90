@@ -51,10 +51,6 @@ program scalar_transport
   character(len=ccs_string_len), dimension(:), allocatable :: variable_names ! variable names for BC reading
   integer(ccs_int), dimension(:), allocatable :: variable_types              ! cell centred upwind, central, etc.
 
-  real(ccs_real), dimension(:), pointer :: output_data
-  integer(ccs_int) :: index_p
-  integer(ccs_int) :: n_local
-
   type(vector_spec) :: vec_properties
 
   type(field_spec) :: field_properties
