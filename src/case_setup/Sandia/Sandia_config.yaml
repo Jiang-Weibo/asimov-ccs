@@ -2,7 +2,7 @@
 title: Sandia
 
 # restart capability
-restart: true 
+restart: false 
 
 #  number of timesteps
 steps: 10000

@@ -1,7 +1,7 @@
 ---
 title: LidDrivenCavity
 # restart capability
-restart: true 
+restart: false 
 
 #  number of iterations
 iterations: 10
