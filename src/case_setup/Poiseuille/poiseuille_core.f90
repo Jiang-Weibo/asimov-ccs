@@ -32,8 +32,8 @@ module poiseuille_core
                    set_is_field_solved, &
                    allocate_fluid_fields, reset_outputlist_counter
   use boundary_conditions, only: read_bc_config, allocate_bc_arrays, set_bc_profile
-  use read_config, only: get_variables, get_boundary_count, get_case_name, get_enable_cell_corrections, &
-                          get_variable_types
+  use read_config, only: get_variables, get_boundary_count, get_boundary_names, get_case_name, &
+                         get_enable_cell_corrections, get_variable_types
   use timestepping, only: set_timestep, activate_timestepping, initialise_old_values, reset_timestepping
   use mesh_utils, only: read_mesh, build_square_mesh, write_mesh, compute_face_interpolation
   use meshing, only: get_total_num_cells, get_global_num_cells, set_mesh_object, nullify_mesh_object, get_local_num_cells
@@ -91,6 +91,8 @@ module poiseuille_core
 
     type(fluid) :: flow_fields
 
+    character(len=128), dimension(:), allocatable :: bnd_names
+    
     call timer_init()
     irank = par_env%proc_id
     isize = par_env%num_procs
@@ -119,7 +121,8 @@ module poiseuille_core
       mesh = input_mesh
     else
       if (irank == par_env%root) print *, "Building mesh"
-      mesh = build_square_mesh(par_env, shared_env, cps, domain_size)
+      call get_boundary_names(ccs_config_file, bnd_names)
+      mesh = build_square_mesh(par_env, shared_env, cps, domain_size, bnd_names)
     end if
     call set_mesh_object(mesh)
 

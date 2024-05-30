@@ -32,8 +32,8 @@ module tgv2d_core
                    set_is_field_solved, &
                    allocate_fluid_fields
   use boundary_conditions, only: read_bc_config, allocate_bc_arrays
-  use read_config, only: get_variables, get_boundary_count, get_store_residuals, get_enable_cell_corrections, &
-                          get_variable_types
+  use read_config, only: get_variables, get_boundary_count, get_boundary_names, get_store_residuals, &
+                         get_enable_cell_corrections, get_variable_types
   use timestepping, only: set_timestep, activate_timestepping, reset_timestepping
   use io_visualisation, only: write_solution, reset_io_visualisation, read_solution
   use fv, only: update_gradient
@@ -87,6 +87,8 @@ contains
 
     type(fluid) :: flow_fields
 
+    character(len=128), dimension(:), allocatable :: bnd_names
+
     irank = par_env%proc_id
     isize = par_env%num_procs
 
@@ -113,7 +115,8 @@ contains
       mesh = input_mesh
     else
       if (irank == par_env%root) print *, "Building mesh"
-      mesh = build_square_mesh(par_env, shared_env, cps, domain_size)
+      call get_boundary_names(ccs_config_file, bnd_names)
+      mesh = build_square_mesh(par_env, shared_env, cps, domain_size, bnd_names)
     end if
     call set_mesh_object(mesh)
 

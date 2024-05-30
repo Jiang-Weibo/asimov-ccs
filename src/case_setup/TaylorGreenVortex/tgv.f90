@@ -32,7 +32,8 @@ program tgv
                           partition_kway, compute_connectivity
   use petsctypes, only: vector_petsc
   use pv_coupling, only: solve_nonlinear
-  use read_config, only: get_variables, get_boundary_count, get_case_name, get_store_residuals, get_enable_cell_corrections, get_variable_types
+  use read_config, only: get_variables, get_boundary_names, get_boundary_count, get_case_name, get_store_residuals, &
+                         get_enable_cell_corrections, get_variable_types
   use timestepping, only: set_timestep, activate_timestepping, initialise_old_values
   use types, only: field, field_spec, upwind_field, central_field, face_field, ccs_mesh, &
                    vector_spec, ccs_vector, io_environment, io_process, &
@@ -90,6 +91,8 @@ program tgv
 
   logical:: use_mpi_splitting
 
+  character(len=128), dimension(:), allocatable :: bnd_names
+  
   ! Launch MPI
   call initialise_parallel_environment(par_env)
   call timer_init()
@@ -133,13 +136,14 @@ program tgv
   ! If cps is no longer the default value, it has been set explicity and
   ! the mesh generator is invoked...
   call timer_register_start("Mesh build/read time", timer_index_build)
+  call get_boundary_names(ccs_config_file, bnd_names)
   if (cps /= huge(0)) then
     ! Create a cubic mesh
     if (irank == par_env%root) print *, "Building mesh"
-    mesh = build_mesh(par_env, shared_env, cps, cps, cps, domain_size)
+    mesh = build_mesh(par_env, shared_env, cps, cps, cps, domain_size, bnd_names)
   else
     if (irank == par_env%root) print *, "Reading mesh file"
-    call read_mesh(par_env, shared_env, case_name, mesh)
+    call read_mesh(par_env, shared_env, case_name, bnd_names, mesh)
   end if
   call set_mesh_object(mesh)
   call timer_stop(timer_index_build)

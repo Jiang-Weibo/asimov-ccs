@@ -4,6 +4,7 @@
 !  \f$\sum_p n_p = N\f$.
 program test_square_mesh_point_distribution
 
+  use ccs_base, only: bnd_names_default
   use testing_lib
   use mesh_utils, only: build_square_mesh
   use meshing, only: get_local_num_cells, get_global_num_cells
@@ -25,7 +26,8 @@ program test_square_mesh_point_distribution
 
   do mctr = 1, size(m)
     n = m(mctr)
-    mesh = build_square_mesh(par_env, shared_env, n, 1.0_ccs_real)
+    mesh = build_square_mesh(par_env, shared_env, n, 1.0_ccs_real, &
+         bnd_names_default(1:4))
     call set_mesh_object(mesh)
 
     call get_local_num_cells(nlocal)

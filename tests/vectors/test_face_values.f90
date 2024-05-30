@@ -2,6 +2,7 @@
 program test_face_values
 
   use testing_lib
+  use ccs_base, only: bnd_names_default
   use kinds, only: ccs_int, ccs_real
   use constants, only: face
   use types, only: vector_spec, ccs_mesh, field, face_field
@@ -24,7 +25,8 @@ program test_face_values
   call init()
 
   ! Create a square mesh
-  mesh = build_square_mesh(par_env, shared_env, cps, 1.0_ccs_real)
+  mesh = build_square_mesh(par_env, shared_env, cps, 1.0_ccs_real, &
+       bnd_names_default(1:4))
   call set_mesh_object(mesh)
 
   allocate (face_field :: mf)

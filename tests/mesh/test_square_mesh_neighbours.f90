@@ -5,6 +5,7 @@ program test_square_mesh_neighbours
 
   use testing_lib
 
+  use ccs_base, only: bnd_names_default
   use meshing, only: create_cell_locator, create_neighbour_locator, count_neighbours, &
                      get_boundary_status, get_local_num_cells, get_local_index
   use meshing, only: set_mesh_object, nullify_mesh_object
@@ -42,7 +43,8 @@ program test_square_mesh_neighbours
     n = m(mctr)
 
     l = parallel_random(par_env)
-    mesh = build_square_mesh(par_env, shared_env, n, l)
+    mesh = build_square_mesh(par_env, shared_env, n, l, &
+         bnd_names_default(1:4))
     call set_mesh_object(mesh)
 
     boundary_ctr = 0

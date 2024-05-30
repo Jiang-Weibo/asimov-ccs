@@ -29,6 +29,7 @@ module read_config
   public :: get_variable_types
   public :: get_bc_field
   public :: get_boundary_count
+  public :: get_boundary_names
   public :: get_store_residuals
   public :: get_enable_cell_corrections
 
@@ -241,7 +242,13 @@ module read_config
     module subroutine get_boundary_count(filename, n_boundaries)
       character(len=*), intent(in) :: filename      !< name of the config file
       integer(ccs_int), intent(out) :: n_boundaries !< number of boundaries
-    end subroutine
+    end subroutine get_boundary_count
+
+    !> Gets the names of boundaries
+    module subroutine get_boundary_names(filename, bnd_names)
+      character(len=*), intent(in) :: filename                                !< Name of the config file
+      character(len=128), dimension(:), allocatable, intent(out) :: bnd_names !< List of boundary names
+    end subroutine get_boundary_names
 
     !> Gets whether residuals should be stored or not
     module subroutine get_store_residuals(filename, store_residuals)

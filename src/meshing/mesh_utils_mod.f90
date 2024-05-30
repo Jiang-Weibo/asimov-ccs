@@ -1,3 +1,10 @@
+!v Module file mesh_utils_mod.f90
+!
+!  Implements utilities for loading/generating meshes.
+!
+!  @dont_fail_linter
+!  This file triggers many false alarms in the linter.
+
 module mesh_utils
 #include "ccs_macros.inc"
 
@@ -103,7 +110,7 @@ module mesh_utils
 contains
 
   !v Read mesh from file
-  subroutine read_mesh(par_env, shared_env, case_name, mesh)
+  subroutine read_mesh(par_env, shared_env, case_name, bnd_names, mesh)
 
     use partitioning, only: compute_connectivity_get_local_cells, &
                             compute_partitioner_input
@@ -113,7 +120,8 @@ contains
 
     class(parallel_environment), allocatable, target, intent(in) :: par_env !< The parallel environment
     class(parallel_environment), allocatable, target, intent(in) :: shared_env !< The parallel environment
-    character(len=:), allocatable :: case_name
+    character(len=*), intent(in) :: case_name
+    character(len=128), dimension(:), intent(in) :: bnd_names
     type(ccs_mesh), intent(inout) :: mesh                                   !< The mesh
 
     ! Local variables
@@ -170,8 +178,70 @@ contains
 
     call cleanup_topo(shared_env, mesh)
 
+    mesh%bnd_names = bnd_names
+    call check_mesh_bnd_names(par_env, mesh)
+    
   end subroutine read_mesh
 
+  !> Helper subroutine to check boundary ID/name compatibility.
+  subroutine check_mesh_bnd_names(par_env, mesh)
+
+    class(parallel_environment), intent(in) :: par_env
+    type(ccs_mesh), intent(in) :: mesh
+
+    integer :: i
+    integer :: bc_cnt
+
+    logical :: id_names_valid
+
+    integer :: ierr
+    
+    if (is_root(par_env)) then
+      print *, "=========================="
+      print *, "Boundary ID map"
+      do i = 1, size(mesh%bnd_names)
+        print *, i, trim(mesh%bnd_names(i))
+      end do
+    end if
+
+    ! The most negative value of neighbour indices (i.e. maximum boundary ID) should equal the
+    ! boundary count. Note that in parallel any given process may not have this many boundaries so
+    ! we use a logical OR to check at least one process has a valid boundary ID count.
+    ! We need to also check that no process exceeds the boundary ID count.
+    bc_cnt = -minval(mesh%topo%nb_indices)
+
+    ! Check range
+    id_names_valid = (bc_cnt == size(mesh%bnd_names))
+    select type(par_env)
+    type is (parallel_environment_mpi)
+      call MPI_Allreduce(MPI_IN_PLACE, id_names_valid, 1, MPI_LOGICAL, MPI_LOR, par_env%comm, ierr)
+    class default
+      call error_abort("Unsupported parallel environment")
+    end select
+    if (.not. id_names_valid) then
+      call error_abort("Maximum boundary ID doesn't match supplied boundary name count")
+    end if
+
+    ! Check no boundary IDs exceed the range
+    id_names_valid = (bc_cnt <= size(mesh%bnd_names))
+    select type(par_env)
+    type is (parallel_environment_mpi)
+      call MPI_Allreduce(MPI_IN_PLACE, id_names_valid, 1, MPI_LOGICAL, MPI_LOR, par_env%comm, ierr)
+    class default
+      call error_abort("Unsupported parallel environment")
+    end select
+    if (.not. id_names_valid) then
+      call error_abort("Maximum boundary ID doesn't match supplied boundary name count")
+    end if
+    call sync(par_env)
+
+    if (is_root(par_env)) then
+      print *, "Boundary name list / ID compatibility: PASS"
+      print *, "=========================="
+    end if
+    
+  end subroutine check_mesh_bnd_names
+  
   !v Read the topology data from an input (HDF5) file
   ! This subroutine assumes the following names are used in the file:
   ! "ncel" - the total number of cells
@@ -829,7 +899,7 @@ contains
   !v Utility constructor to build a 2D mesh with hex cells.
   !
   !  Builds a Cartesian grid of nx*ny cells.
-  function build_square_mesh(par_env, shared_env, cps, side_length) result(mesh)
+  function build_square_mesh(par_env, shared_env, cps, side_length, bnd_names) result(mesh)
 
     use partitioning, only: compute_partitioner_input
 
@@ -837,11 +907,12 @@ contains
     class(parallel_environment), allocatable, target, intent(in) :: shared_env !< The shared memory environment
     integer(ccs_int), intent(in) :: cps                !< Number of cells per side of the mesh.
     real(ccs_real), intent(in) :: side_length          !< The length of the side.
-
+    character(len=128), dimension(4), intent(in) :: bnd_names !< Boundary name list
+    
     type(ccs_mesh) :: mesh                             !< The resulting mesh.
 
     character(:), allocatable :: error_message
-
+    
     if (cps * cps < par_env%num_procs) then
       error_message = "ERROR: Global number of cells < number of ranks. &
                       &Increase the mesh size or reduce the number of MPI ranks."
@@ -862,6 +933,10 @@ contains
 
     call cleanup_topo(shared_env, mesh)
 
+    ! Create boundary names list
+    mesh%bnd_names = bnd_names
+    call check_mesh_bnd_names(par_env, mesh)
+  
   end function build_square_mesh
 
   !v Utility constructor to build a square mesh.
@@ -972,8 +1047,8 @@ contains
           end do
 
           ! Assemble cells and faces
-          ! XXX: Negative neighbour indices are used to indicate boundaries using the same numbering
-          !      as cell-relative neighbour indexing, i.e.
+          ! @note Negative neighbour indices are used to indicate boundaries using the same
+          !       numbering as cell-relative neighbour indexing, i.e.
           !        -1 = left boundary
           !        -2 = right boundary
           !        -3 = bottom boundary
@@ -1245,7 +1320,7 @@ contains
 
     real(ccs_real), dimension(3) :: x_nb_3 ! Cell centre array of neighbour cell
     real(ccs_real), dimension(2) :: x_nb   ! Cell centre array of neighbour cell
-    type(neighbour_locator) :: loc_nb    ! the neighbour locator object.
+    type(neighbour_locator) :: loc_nb      ! the neighbour locator object.
 
     real(ccs_real), dimension(2) :: x_f    ! Face centre array
     real(ccs_real), dimension(2) :: normal ! Face normal array
@@ -1303,7 +1378,7 @@ contains
             if (.not. is_boundary) then
               ! faces are midway between cell centre and nb cell centre
               call get_centre(loc_nb, x_nb_3)
-              x_nb(:) = x_nb_3(1:2) ! XXX: hacky fix for issue with resolving get_neighbour_centre in 2D
+              x_nb(:) = x_nb_3(1:2) ! hacky fix for issue with resolving get_neighbour_centre in 2D
 
               x_f(:) = 0.5_ccs_real * (x_p(:) + x_nb(:))
               normal(:) = (x_nb(:) - x_p(:)) / h
@@ -1390,7 +1465,7 @@ contains
   !v Utility constructor to build a 3D mesh with hex cells.
   !
   !  Builds a Cartesian grid of nx*ny*nz cells.
-  function build_mesh(par_env, shared_env, nx, ny, nz, side_length) result(mesh)
+  function build_mesh(par_env, shared_env, nx, ny, nz, side_length, bnd_names) result(mesh)
 
     use partitioning, only: compute_partitioner_input
     use parallel, only: timer
@@ -1402,7 +1477,8 @@ contains
     integer(ccs_int), intent(in) :: ny                 !< Number of cells in the y direction.
     integer(ccs_int), intent(in) :: nz                 !< Number of cells in the z direction.
     real(ccs_real), intent(in) :: side_length          !< The length of the side.
-
+    character(len=128), dimension(6), intent(in) :: bnd_names
+    
     type(ccs_mesh) :: mesh                             !< The resulting mesh.
 
     character(:), allocatable :: error_message
@@ -1410,7 +1486,7 @@ contains
     integer(ccs_int) :: timer_build_topo
     integer(ccs_int) :: timer_build_geo
     integer(ccs_int) :: timer_partitioner_input
-
+    
     call timer_register("Build mesh topology", timer_build_topo)
     call timer_register("Compute partitioner input", timer_partitioner_input)
     call timer_register("Build mesh geometry", timer_build_geo)
@@ -1420,7 +1496,7 @@ contains
     call nullify_mesh_object()
 
     if (.not. (nx .eq. ny .and. ny .eq. nz)) then !< @note Must be a cube (for now) @endnote
-      error_message = "Only supporting cubes for now - nx, ny and nz must be the same!"
+      error_message = "Only supporting cubes for now - nx, ny and nz must be the same"
       call error_abort(error_message)
     end if
 
@@ -1446,6 +1522,10 @@ contains
 
     call cleanup_topo(shared_env, mesh)
 
+    ! Create boundary names list
+    mesh%bnd_names = bnd_names
+    call check_mesh_bnd_names(par_env, mesh)
+    
   end function build_mesh
 
   !v Utility constructor to build a 3D mesh with hex cells.
@@ -1559,8 +1639,8 @@ contains
         end do
 
         ! Assemble cells and faces
-        ! XXX: Negative neighbour indices are used to indicate boundaries using the same numbering
-        !      as cell-relative neighbour indexing, i.e.
+        ! @note Negative neighbour indices are used to indicate boundaries using the same numbering
+        !       as cell-relative neighbour indexing, i.e.
         !        -1 = left boundary
         !        -2 = right boundary
         !        -3 = bottom boundary
@@ -2549,7 +2629,7 @@ contains
     class(parallel_environment), allocatable, target, intent(in) :: roots_env !< The parallel environment
     type(ccs_mesh), intent(inout) :: mesh                             !< The resulting mesh.
 
-    integer(ccs_int) :: iproc, start, end
+    integer(ccs_int) :: iproc, first, last
     integer(ccs_int) :: global_num_cells
 
     ! roots_env kept as argument for consistency with partition_kway
@@ -2560,9 +2640,9 @@ contains
 
     if (is_root(shared_env)) then
       do iproc = 0, par_env%num_procs - 1
-        start = global_start(global_num_cells, iproc, par_env%num_procs)
-        end = start + local_count(global_num_cells, iproc, par_env%num_procs) - 1
-        mesh%topo%graph_conn%global_partition(start:end) = iproc
+        first = global_start(global_num_cells, iproc, par_env%num_procs)
+        last = first + local_count(global_num_cells, iproc, par_env%num_procs) - 1
+        mesh%topo%graph_conn%global_partition(first:last) = iproc
       end do
     end if
 

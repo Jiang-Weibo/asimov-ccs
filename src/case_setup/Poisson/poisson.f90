@@ -301,10 +301,13 @@ contains
 
   subroutine initialise_poisson(par_env, shared_env)
 
+    use ccs_base, only: bnd_names_default
+
     class(parallel_environment), allocatable :: par_env
     class(parallel_environment), allocatable :: shared_env
 
-    mesh = build_square_mesh(par_env, shared_env, cps, 1.0_ccs_real)
+    mesh = build_square_mesh(par_env, shared_env, cps, 1.0_ccs_real, &
+                             bnd_names_default(1:4))
     call set_mesh_object(mesh)
 
   end subroutine initialise_poisson

@@ -84,7 +84,7 @@ variables:
 boundaries:
   n_boundaries: 8
   boundary_1: 
-    name: left
+    name: default
     type: neumann
     value: 0
     variable_p:
@@ -96,11 +96,11 @@ boundaries:
       type: dirichlet
       value: 0
   boundary_2:
-    name: right
+    name: live
     type: neumann
     value: 0
   boundary_3:
-    name: bottom
+    name: inflow
     type: neumann
     value: 0
     variable_p:
@@ -112,7 +112,7 @@ boundaries:
       type: dirichlet
       value: 0
   boundary_4:
-    name: top
+    name: outflow
     type: neumann
     value: 0
     variable_p:
@@ -125,7 +125,7 @@ boundaries:
       type: dirichlet
       value: 0
   boundary_5:
-    name: back
+    name: step
     type: neumann
     value: 0
     variable_p:
@@ -137,7 +137,7 @@ boundaries:
       type: dirichlet
       value: 0
   boundary_6:
-    name: front
+    name: bottomwall
     type: neumann
     value: 0
     variable_p:
@@ -149,7 +149,7 @@ boundaries:
       type: dirichlet
       value: 0
   boundary_7:
-    name: other1
+    name: backwall
     type: neumann
     value: 0
     variable_p:
@@ -161,7 +161,7 @@ boundaries:
       type: dirichlet
       value: 0
   boundary_8:
-    name: other2
+    name: topwall
     type: neumann
     value: 0
     variable_p:

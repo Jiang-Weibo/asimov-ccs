@@ -94,7 +94,7 @@ variables:
 boundaries:
   n_boundaries: 10
   boundary_1: 
-    name: left
+    name: default
     type: neumann
     value: 0
     variable_u:
@@ -103,8 +103,8 @@ boundaries:
     variable_v:
       type: dirichlet
       value: 0
-  boundary_2: # atmos
-    name: right
+  boundary_2:
+    name: atmos
     type: dirichlet
     value: 0
     variable_p:
@@ -116,8 +116,8 @@ boundaries:
     variable_scalar:
       type: neumann
       value: 0
-  boundary_3: #coflow
-    name: bottom
+  boundary_3:
+    name: coflow
     type: neumann
     value: 0
     variable_p:
@@ -135,8 +135,8 @@ boundaries:
     variable_scalar:
       type: dirichlet
       value: 0
-  boundary_4: #jet
-    name: top
+  boundary_4:
+    name: jet
     type: neumann
     value: 0
     variable_p:
@@ -154,8 +154,8 @@ boundaries:
     variable_scalar:
       type: dirichlet
       value: 1
-  boundary_5: #pilot
-    name: back
+  boundary_5:
+    name: pilot
     type: neumann
     value: 0
     variable_p:
@@ -173,8 +173,8 @@ boundaries:
     variable_scalar:
       type: dirichlet
       value: 0
-  boundary_6: #wall
-    name: front
+  boundary_6:
+    name: wall
     type: neumann
     value: 0
     variable_p:
@@ -192,8 +192,8 @@ boundaries:
     variable_scalar:
       type: neumann
       value: 0
-  boundary_7: #rims
-    name: other1
+  boundary_7:
+    name: rims
     type: neumann
     value: 0
     variable_p:
@@ -210,8 +210,8 @@ boundaries:
     variable_scalar:
       type: neumann
       value: 0
-  boundary_8: #walls_pilot
-    name: other2
+  boundary_8:
+    name: walls_pilot
     type: neumann
     value: 0
     variable_p:
@@ -229,8 +229,8 @@ boundaries:
     variable_scalar:
       type: neumann
       value: 0
-  boundary_9: #walls_jet
-    name: other3
+  boundary_9:
+    name: walls_jet
     type: neumann
     value: 0
     variable_p:
@@ -248,8 +248,8 @@ boundaries:
     variable_scalar:
       type: neumann
       value: 0
-  boundary_10: #outflow
-    name: other4
+  boundary_10:
+    name: outflow
     type: neumann
     value: 0
     variable_p:

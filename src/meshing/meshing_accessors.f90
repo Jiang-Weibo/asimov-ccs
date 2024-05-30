@@ -765,4 +765,84 @@ contains
     mesh%is_generated = is_generated
   end subroutine
 
+  !> Get the numerical ID of a boundary from its name
+  pure module subroutine get_bc_id(mesh, name, bc_id)
+    type(ccs_mesh), intent(in) :: mesh     !< The mesh
+    character(len=*), intent(in) :: name   !< The boundary name
+    integer(ccs_int), intent(out) :: bc_id !< The boundary ID
+
+    integer(ccs_int) :: nbc
+    logical :: found
+
+    found = .false.
+    nbc = size(mesh%bnd_names)
+
+    do bc_id = 1, nbc
+      if (trim(name) == trim(mesh%bnd_names(bc_id))) then
+        found = .true.
+        exit
+      end if
+    end do
+
+    if (.not.found) then
+      ! Failed to find BC by name
+      error stop unknown_bc_name
+    end if
+    
+  end subroutine get_bc_id
+
+  !> Find a list of (boundary) faces based on their boundary name
+  module subroutine find_face_entities(mesh, name, faces)
+    type(ccs_mesh), intent(in) :: mesh                                  !< The mesh
+    character(len=*), intent(in) :: name                                !< The boundary name
+    type(face_locator), dimension(:), allocatable, intent(out) :: faces !< The list of boundary faces
+
+    integer(ccs_int) :: id
+
+    integer :: i, j
+    
+    integer(ccs_int) :: local_num_cells
+    integer(ccs_int) :: nnb
+
+    type(cell_locator) :: loc_p
+    type(face_locator) :: loc_f
+    type(neighbour_locator) :: loc_nb
+
+    logical :: is_boundary
+    integer(ccs_int) :: boundary_id
+    
+    ! First find the ID of the boundary
+    call get_bc_id(mesh, name, id)
+
+    allocate(faces(0))
+
+    ! Loop over cell-faces
+    call get_local_num_cells(local_num_cells)
+    do i = 1, local_num_cells
+      call create_cell_locator(i, loc_p)
+      call count_neighbours(loc_p, nnb)
+
+      do j = 1, nnb
+        call create_neighbour_locator(loc_p, j, loc_nb)
+        call get_boundary_status(loc_nb, is_boundary)
+
+        if (is_boundary) then
+          call get_local_index(loc_nb, boundary_id)
+          boundary_id = -boundary_id
+          if (boundary_id == id) then
+            call create_face_locator(i, j, loc_f)
+            faces = [faces, loc_f]
+          end if
+        end if
+      end do
+    end do
+
+    if (size(faces) == 0) then
+      ! Failed to find any
+      deallocate(faces)
+    end if
+
+  end subroutine find_face_entities
+
+  
 end submodule meshing_accessors

@@ -6,6 +6,7 @@
 program test_advection_coeff
 
   use testing_lib
+  use ccs_base, only: bnd_names_default
   use constants, only: ndim, insert_mode
   use types, only: field, upwind_field, central_field, cell_locator, face_locator, neighbour_locator
   use mesh_utils, only: build_square_mesh
@@ -38,7 +39,8 @@ program test_advection_coeff
 
   call init()
 
-  mesh = build_square_mesh(par_env, shared_env, cps, 1.0_ccs_real)
+  mesh = build_square_mesh(par_env, shared_env, cps, 1.0_ccs_real, &
+       bnd_names_default(1:4))
   call set_mesh_object(mesh)
 
   call get_local_num_cells(local_num_cells)
