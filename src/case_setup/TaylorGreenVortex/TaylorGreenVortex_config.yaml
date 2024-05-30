@@ -2,7 +2,7 @@
 title: TaylorGreenVortex
 
 # restart capability
-restart = true 
+restart: true 
 
 #  number of timesteps
 steps: 10

@@ -2,7 +2,7 @@
 title: Poiseuille
 
 # restart capability
-restart = true 
+restart: true 
 
 #  number of timesteps
 steps: 100
