@@ -1,6 +1,9 @@
 ---
 title: Poiseuille
 
+# restart capability
+restart = true 
+
 #  number of timesteps
 steps: 100
 #  number of iterations

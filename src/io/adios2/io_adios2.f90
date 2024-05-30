@@ -173,12 +173,17 @@ contains
     type(adios2_variable) :: adios2_var
     integer(int64), dimension(:), allocatable :: tmp_var64
     integer(ccs_int) :: ierr
+    integer(int64) :: step_count = 1
 
     select type (io_proc)
     type is (adios2_io_process)
 
       call adios2_inquire_variable(adios2_var, io_proc%io_task, var_name, ierr)
       call adios2_set_selection(adios2_var, 1, global_start, count, ierr)
+
+      if (present(step)) then
+        call adios2_set_step_selection(adios2_var, step, step_count, ierr)
+      endif
 
       if (adios2_var%type == adios2_type_integer8) then
 
@@ -217,12 +222,17 @@ contains
     type(adios2_variable) :: adios2_var
     integer(int32), dimension(:), allocatable :: tmp_var32
     integer(ccs_int) :: ierr
+    integer(int64) :: step_count = 1
 
     select type (io_proc)
     type is (adios2_io_process)
 
       call adios2_inquire_variable(adios2_var, io_proc%io_task, var_name, ierr)
       call adios2_set_selection(adios2_var, 1, global_start, count, ierr)
+
+      if (present(step)) then
+        call adios2_set_step_selection(adios2_var, step, step_count, ierr)
+      endif
 
       if (adios2_var%type == adios2_type_integer4) then
 
@@ -260,12 +270,17 @@ contains
     type(adios2_variable) :: adios2_var
     integer(int64), dimension(:, :), allocatable :: tmp_var64
     integer(ccs_int) :: ierr
+    integer(int64) :: step_count = 1
 
     select type (io_proc)
     type is (adios2_io_process)
 
       call adios2_inquire_variable(adios2_var, io_proc%io_task, var_name, ierr)
       call adios2_set_selection(adios2_var, 2, global_start, count, ierr)
+
+      if (present(step)) then
+        call adios2_set_step_selection(adios2_var, step, step_count, ierr)
+      endif
 
       if (adios2_var%type == adios2_type_integer8) then
 
@@ -304,12 +319,17 @@ contains
     type(adios2_variable) :: adios2_var
     integer(int32), dimension(:, :), allocatable :: tmp_var32
     integer(ccs_int) :: ierr
+    integer(int64) :: step_count = 1
 
     select type (io_proc)
     type is (adios2_io_process)
 
       call adios2_inquire_variable(adios2_var, io_proc%io_task, var_name, ierr)
       call adios2_set_selection(adios2_var, 2, global_start, count, ierr)
+
+      if (present(step)) then
+        call adios2_set_step_selection(adios2_var, step, step_count, ierr)
+      endif
 
       if (adios2_var%type == adios2_type_integer4) then
 
@@ -347,12 +367,17 @@ contains
     type(adios2_variable) :: adios2_var
     real(real64), dimension(:), allocatable :: tmp_var64
     integer(ccs_int) :: ierr
+    integer(int64) :: step_count = 1
 
     select type (io_proc)
     type is (adios2_io_process)
 
       call adios2_inquire_variable(adios2_var, io_proc%io_task, var_name, ierr)
       call adios2_set_selection(adios2_var, 1, global_start, count, ierr)
+
+      if (present(step)) then
+        call adios2_set_step_selection(adios2_var, step, step_count, ierr)
+      endif
 
       if (adios2_var%type == adios2_type_dp) then
 
@@ -439,12 +464,17 @@ contains
     type(adios2_variable) :: adios2_var
     real(real64), dimension(:, :), allocatable :: tmp_var64
     integer(ccs_int) :: ierr
+    integer(int64) :: step_count = 1
 
     select type (io_proc)
     type is (adios2_io_process)
 
       call adios2_inquire_variable(adios2_var, io_proc%io_task, var_name, ierr)
       call adios2_set_selection(adios2_var, 2, global_start, count, ierr)
+
+      if (present(step)) then
+        call adios2_set_step_selection(adios2_var, step, step_count, ierr)
+      endif
 
       if (adios2_var%type == adios2_type_dp) then
 
@@ -483,6 +513,7 @@ contains
     type(adios2_variable) :: adios2_var
     real(real32), dimension(:, :), allocatable :: tmp_var32
     integer(ccs_int) :: ierr
+    integer(int64) :: step_count = 1
 
     select type (io_proc)
     type is (adios2_io_process)
@@ -490,6 +521,11 @@ contains
       call adios2_inquire_variable(adios2_var, io_proc%io_task, var_name, ierr)
 
       call adios2_set_selection(adios2_var, 2, global_start, count, ierr)
+
+      if (present(step)) then
+        call adios2_set_step_selection(adios2_var, step, step_count, ierr)
+      endif
+
       if (adios2_var%type == adios2_type_real) then
 
         allocate (tmp_var32(size(var, dim=1), size(var, dim=2)))
