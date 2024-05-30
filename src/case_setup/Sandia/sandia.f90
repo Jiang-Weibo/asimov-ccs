@@ -9,7 +9,7 @@ program sandia
   use case_config, only: num_steps, num_iters, dt, domain_size, write_frequency, &
                          velocity_relax, pressure_relax, res_target, case_name, &
                          write_gradients, velocity_solver_method_name, velocity_solver_precon_name, &
-                         pressure_solver_method_name, pressure_solver_precon_name
+                         pressure_solver_method_name, pressure_solver_precon_name, restart
   use constants, only: cell, face, ccsconfig, ccs_string_len, geoext, adiosconfig, ndim, &
                        cell_centred_central, cell_centred_upwind, face_centred, &
                        ccs_split_type_shared, ccs_split_type_low_high, ccs_split_undefined
@@ -248,7 +248,10 @@ program sandia
   call timer_register("I/O time for solution", timer_index_io_sol)
   call timer_register("Solver time inc I/O", timer_index_sol)
 
-  call read_solution(par_env, case_path, mesh, flow_fields)
+  if(restart) then
+    print*, "restart capability activated"
+    call read_solution(par_env, case_path, mesh, flow_fields)
+  end if 
 
   do t = 1, num_steps
     call timer_start(timer_index_sol)

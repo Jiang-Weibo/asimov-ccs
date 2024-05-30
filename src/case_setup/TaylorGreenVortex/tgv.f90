@@ -11,7 +11,7 @@ program tgv
                          velocity_relax, pressure_relax, res_target, case_name, &
                          write_gradients, velocity_solver_method_name, velocity_solver_precon_name, &
                          pressure_solver_method_name, pressure_solver_precon_name, &
-                         compute_bwidth, compute_partqual
+                         compute_bwidth, compute_partqual, restart
   use constants, only: cell, face, ccsconfig, ccs_string_len, geoext, adiosconfig, ndim, &
                        cell_centred_central, cell_centred_upwind, face_centred
   use constants, only: ccs_split_type_shared, ccs_split_type_low_high, ccs_split_undefined
@@ -255,8 +255,10 @@ program tgv
   nullify(viscosity)
   nullify(density)
 
-  call read_solution(par_env, case_path, mesh, flow_fields)
-
+  if(restart) then
+    print*, "restart capability activated"
+    call read_solution(par_env, case_path, mesh, flow_fields)
+  end if 
 
   call timer_stop(timer_index_init)
   call timer_register("I/O time for solution", timer_index_io_sol)
@@ -347,6 +349,8 @@ contains
     if (size(variable_types) /= size(variable_names)) then
        call error_abort("The number of variable types does not match the number of named variables")
     end if
+
+    call get_value(config_file, 'restart', restart)
 
     call get_value(config_file, 'steps', num_steps)
     if (num_steps == huge(0)) then

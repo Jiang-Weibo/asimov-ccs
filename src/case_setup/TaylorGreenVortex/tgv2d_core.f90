@@ -9,7 +9,7 @@ module tgv2d_core
                          velocity_relax, pressure_relax, res_target, case_name, &
                          write_gradients, velocity_solver_method_name, velocity_solver_precon_name, &
                          pressure_solver_method_name, pressure_solver_precon_name, &
-                         compute_bwidth, compute_partqual
+                         compute_bwidth, compute_partqual, restart
   use constants, only: cell, face, ccsconfig, ccs_string_len, &
                        cell_centred_central, cell_centred_upwind, face_centred
   use kinds, only: ccs_real, ccs_int
@@ -238,7 +238,10 @@ contains
     nullify(viscosity)
     nullify(density)
 
-    call read_solution(par_env, case_path, mesh, flow_fields)
+    if(restart) then
+      print*, "restart capability activated"
+      call read_solution(par_env, case_path, mesh, flow_fields)
+    end if 
     
     call timer(init_time)
 
@@ -305,6 +308,8 @@ contains
     if (size(variable_types) /= size(variable_names)) then
        call error_abort("The number of variable types does not match the number of named variables")
     end if
+
+    call get_value(config_file, 'restart', restart)
 
     call get_value(config_file, 'steps', num_steps)
     if (num_steps == huge(0)) then

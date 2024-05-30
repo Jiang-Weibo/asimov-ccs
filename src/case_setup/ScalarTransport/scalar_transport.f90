@@ -10,7 +10,7 @@ program scalar_transport
 
   use ccs_base, only: mesh
   use case_config, only: num_steps, num_iters, cps, domain_size, case_name, &
-                         res_target, write_gradients, dt, write_frequency
+                         res_target, write_gradients, dt, write_frequency, restart
   use constants, only: cell, face, ccsconfig, ccs_string_len, &
                        face_centred, cell_centred_central, cell_centred_upwind, &
                        ccs_split_type_low_high
@@ -181,7 +181,10 @@ program scalar_transport
     nullify(phi)
   end do
 
-  call read_solution(par_env, case_path, mesh, flow_fields)
+  if(restart) then
+    print*, "restart capability activated"
+    call read_solution(par_env, case_path, mesh, flow_fields)
+  end if 
 
   if (irank == par_env%root) then
     call print_configuration()
@@ -249,6 +252,8 @@ contains
     if (size(variable_types) /= size(variable_names)) then
        call error_abort("The number of variable types does not match the number of named variables")
     end if
+
+    call get_value(config_file, 'restart', restart)
     
     call get_value(config_file, 'steps', num_steps)
     if (num_steps == huge(0)) then

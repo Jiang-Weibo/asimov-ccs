@@ -9,7 +9,7 @@ module poiseuille_core
   use case_config, only: num_steps, num_iters, dt, cps, domain_size, write_frequency, &
                          velocity_relax, pressure_relax, res_target, case_name, &
                          write_gradients, velocity_solver_method_name, velocity_solver_precon_name, &
-                         pressure_solver_method_name, pressure_solver_precon_name
+                         pressure_solver_method_name, pressure_solver_precon_name, restart
   use constants, only: cell, face, ccsconfig, ccs_string_len, geoext, adiosconfig, ndim, &
                        cell_centred_central, cell_centred_upwind, face_centred
   use kinds, only: ccs_real, ccs_int, ccs_long
@@ -243,7 +243,10 @@ module poiseuille_core
     call timer_stop(timer_index_init)
     call timer_register_start("Solver time inc I/O", timer_index_sol)
 
-    call read_solution(par_env, case_path, mesh, flow_fields)
+    if(restart) then
+      print*, "restart capability activated"
+      call read_solution(par_env, case_path, mesh, flow_fields)
+    end if 
 
     call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
                           flow_fields)
@@ -308,6 +311,8 @@ module poiseuille_core
     if (size(variable_types) /= size(variable_names)) then
        call error_abort("The number of variable types does not match the number of named variables")
     end if
+
+    call get_value(config_file, 'restart', restart)
 
     call get_value(config_file, 'steps', num_steps)
     if (num_steps == huge(0)) then
