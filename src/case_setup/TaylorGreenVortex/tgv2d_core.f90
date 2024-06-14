@@ -9,7 +9,7 @@ module tgv2d_core
                          velocity_relax, pressure_relax, res_target, case_name, &
                          write_gradients, velocity_solver_method_name, velocity_solver_precon_name, &
                          pressure_solver_method_name, pressure_solver_precon_name, &
-                         compute_bwidth, compute_partqual, restart
+                         compute_bwidth, compute_partqual, restart, unsteady
   use constants, only: cell, face, ccsconfig, ccs_string_len, &
                        cell_centred_central, cell_centred_upwind, face_centred
   use kinds, only: ccs_real, ccs_int
@@ -248,28 +248,53 @@ contains
     
     call timer(init_time)
 
-    do t = 1, num_steps
+    if (unsteady) then
+      print*, "unsteady-state activated"
+      do t = 1, num_steps
+        call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
+                             flow_fields)
+  
+        call get_field(flow_fields, "u", u)
+        call get_field(flow_fields, "v", v)
+        call get_field(flow_fields, "w", w)
+        call get_field(flow_fields, "p", p)
+        call calc_tgv2d_error(par_env, u, v, w, p, error_L2, error_Linf)
+        call calc_kinetic_energy(par_env, u, v, w)
+  
+        call calc_enstrophy(par_env, u, v, w)
+        nullify(u)
+        nullify(v)
+        nullify(w)
+        nullify(p)
+  
+        if ((t == 1) .or. (t == num_steps) .or. (mod(t, write_frequency) == 0)) then
+          call write_solution(par_env, case_path, mesh, flow_fields, t, num_steps, dt)
+        end if
+  
+      end do
+    else 
+      print*, "steady-state activated"
       call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
-                           flow_fields)
-
+                             flow_fields)
+  
       call get_field(flow_fields, "u", u)
       call get_field(flow_fields, "v", v)
       call get_field(flow_fields, "w", w)
       call get_field(flow_fields, "p", p)
       call calc_tgv2d_error(par_env, u, v, w, p, error_L2, error_Linf)
       call calc_kinetic_energy(par_env, u, v, w)
-
+  
       call calc_enstrophy(par_env, u, v, w)
       nullify(u)
       nullify(v)
       nullify(w)
       nullify(p)
 
-      if ((t == 1) .or. (t == num_steps) .or. (mod(t, write_frequency) == 0)) then
-        call write_solution(par_env, case_path, mesh, flow_fields, t, num_steps, dt)
-      end if
+      call write_solution(par_env, case_path, mesh, flow_fields)
+    end if
 
-    end do
+
+    
 
     ! Clean-up
 
@@ -313,6 +338,8 @@ contains
     end if
 
     call get_value(config_file, 'restart', restart)
+
+    call get_value(config_file, 'unsteady', unsteady)
 
     call get_value(config_file, 'steps', num_steps)
     if (num_steps == huge(0)) then

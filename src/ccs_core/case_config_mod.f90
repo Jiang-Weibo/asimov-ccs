@@ -13,6 +13,7 @@ module case_config
 
   ! Restart a simulation
   logical, save, public :: restart = .false.
+  logical, save, public :: unsteady = .false.
 
   ! Number of timesteps and iterations
   integer(ccs_int), public :: num_steps = huge(0)
