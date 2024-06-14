@@ -13,7 +13,8 @@ program test_tgv_prism_layer
   use mesh_utils, only: compute_face_interpolation
   use meshing, only: get_local_num_cells, get_total_num_cells, set_mesh_object, nullify_mesh_object, &
                      create_cell_locator, create_face_locator, create_vert_locator, &
-                     get_centre, set_centre, set_area, set_volume, get_face_normal
+                     get_centre, set_centre, set_area, set_volume, get_face_normal, get_volume, get_face_area
+  use utils, only: debug_print, str
 
   implicit none
 
@@ -51,7 +52,7 @@ program test_tgv_prism_layer
     mesh = build_square_mesh(par_env, shared_env, cps, domain_size, &
          bnd_names_default(1:4))
 
-    call generate_prism_layer(growth_rate, cps, mesh)
+    call generate_prism_layer(shared_env, growth_rate, cps, mesh)
 
     call run_tgv2d(par_env, shared_env, error_L2(:, i), error_Linf(:, i), input_mesh=mesh)
   end do
@@ -78,7 +79,8 @@ program test_tgv_prism_layer
 contains
 
   !v Modifies a square mesh by applying a growth rate along the x axis hence generating a prism layer
-  subroutine generate_prism_layer(growth_rate, cps, mesh)
+  subroutine generate_prism_layer(shared_env, growth_rate, cps, mesh)
+    class(parallel_environment), intent(in) :: shared_env
     real(ccs_real), intent(in) :: growth_rate
     integer(ccs_int), intent(in) :: cps
     type(ccs_mesh), intent(inout) :: mesh
@@ -139,6 +141,8 @@ contains
       x_p(1) = 0.5_ccs_real * (apply_gr(x_p(1) + dx/2, growth_rate) + apply_gr(x_p(1) - dx/2, growth_rate))
       call set_centre(loc_p, x_p)
     end do
+
+    call sync(shared_env)
 
     ! Update face interpolation
     call compute_face_interpolation(mesh)
