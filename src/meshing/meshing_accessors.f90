@@ -422,7 +422,7 @@ contains
     type(cell_locator), intent(in) :: loc_p   !< The cell locator object
 
     associate (cell => loc_p%index_p, &
-               offset => mesh%topo%shared_array_local_offset)   ! volumes arrays consist of only local cells, hence specify local offset
+               offset => mesh%topo%shared_array_total_offset)   ! volumes arrays consist of only local cells, hence specify local offset
       mesh%geo%volumes(cell+offset) = volume
     end associate
   end subroutine set_volume
