@@ -4,6 +4,8 @@ module error_analysis
 
   use kinds
   use types
+  use constants, only: ndim
+  use meshing, only: get_centre, set_centre, create_cell_locator
 
 contains
 
@@ -115,6 +117,8 @@ contains
     real(ccs_real) :: dx
     integer(ccs_int) :: icell, total_num_cells, idim, icell_global
     real(ccs_real) :: disturbance
+    type(cell_locator) :: loc_p
+    real(ccs_real), dimension(ndim) :: x_p
 
     dx = domain_size / real(cps)
 
