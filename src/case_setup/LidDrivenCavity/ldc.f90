@@ -268,9 +268,24 @@ contains
 
     call get_value(config_file, 'restart', restart)
 
-    call get_value(config_file, 'iterations', num_iters)
+    call get_value(config_file, 'iterationsSteady', num_iters)
     if (num_iters == huge(0)) then
       call error_abort("No value assigned to num_iters.")
+    end if
+
+    call get_value(config_file, 'steps', num_steps)
+    if (num_steps == huge(0)) then
+      call error_abort("No value assigned to num_steps.")
+    end if
+
+    call get_value(config_file, 'iterationsUnsteady', num_iters)
+    if (num_iters == huge(0)) then
+      call error_abort("No value assigned to num_iters.")
+    end if
+
+    call get_value(config_file, 'dt', dt)
+    if (dt == huge(0.0)) then
+      call error_abort("No value assigned to dt.")
     end if
 
     if (cps == huge(0)) then ! cps was not set on the command line

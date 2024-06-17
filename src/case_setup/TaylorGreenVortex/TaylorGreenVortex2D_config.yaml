@@ -7,10 +7,13 @@ restart: false
 # unstaedy state
 unsteady: true
 
+#  number of steady iterations
+iterations_steady: 100
+
 #  number of timesteps
 steps: 5
-#  number of iterations
-iterations: 5
+#  number of unsteady iterations
+iterations_unsteady: 5
 # time step size
 dt: 0.01
 

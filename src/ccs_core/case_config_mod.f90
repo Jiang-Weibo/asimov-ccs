@@ -17,7 +17,8 @@ module case_config
 
   ! Number of timesteps and iterations
   integer(ccs_int), public :: num_steps = huge(0)
-  integer(ccs_int), public :: num_iters = huge(0)
+  integer(ccs_int), public :: num_iters_steady = huge(0)
+  integer(ccs_int), public :: num_iters_unsteady = huge(0)
 
   ! Number of cells per side (used for mesh generation)
   integer(ccs_int), public :: cps = huge(0)
