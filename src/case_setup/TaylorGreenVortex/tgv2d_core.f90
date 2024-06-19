@@ -5,7 +5,7 @@ module tgv2d_core
   use petscsys
 
   use ccs_base, only: mesh
-  use case_config, only: num_steps, num_iters_steady, num_iters_unsteady, dt, cps, domain_size, write_frequency, &
+  use case_config, only: num_steps, num_iters, dt, cps, domain_size, write_frequency, &
                          velocity_relax, pressure_relax, res_target, case_name, &
                          write_gradients, velocity_solver_method_name, velocity_solver_precon_name, &
                          pressure_solver_method_name, pressure_solver_precon_name, &
@@ -67,7 +67,7 @@ contains
 
     integer(ccs_int) :: n_boundaries
 
-    integer(ccs_int) :: it_start, it_end_steady, it_end_unsteady
+    integer(ccs_int) :: it_start, it_end
     integer(ccs_int) :: irank ! MPI rank ID
     integer(ccs_int) :: isize ! Size of MPI world
 
@@ -136,8 +136,7 @@ contains
 
     ! Set start and end iteration numbers (read from input file)
     it_start = 1
-    it_end_steady = num_iters_steady
-    it_end_unsteady = num_iters_unsteady
+    it_end = num_iters
 
     ! Initialise fields
     if (irank == par_env%root) print *, "Initialise fields"
@@ -252,7 +251,7 @@ contains
     if (unsteady) then
       print*, "unsteady-state activated"
       do t = 1, num_steps
-        call solve_nonlinear(par_env, mesh, it_start, it_end_unsteady, res_target, &
+        call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
                              flow_fields)
   
         call get_field(flow_fields, "u", u)
@@ -275,7 +274,7 @@ contains
       end do
     else 
       print*, "steady-state activated"
-      call solve_nonlinear(par_env, mesh, it_start, it_end_steady, res_target, &
+      call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
                              flow_fields)
   
       call get_field(flow_fields, "u", u)
@@ -342,25 +341,23 @@ contains
 
     call get_value(config_file, 'unsteady', unsteady)
 
-    call get_value(config_file, 'iterations_steady', num_iters_steady) ! steady-state
-    if (num_iters_steady == huge(0)) then
+    call get_value(config_file, 'iterations', num_iters) ! steady-state
+    if (num_iters == huge(0)) then
       call error_abort("No value assigned to num_iters.")
     end if
 
-    call get_value(config_file, 'steps', num_steps)
-    if (num_steps == huge(0)) then
-      call error_abort("No value assigned to num_steps.")
-    end if
+    if(unsteady) then
+      call get_value(config_file, 'steps', num_steps)
+      if (num_steps == huge(0)) then
+        call error_abort("No value assigned to num_steps.")
+      end if
 
-    call get_value(config_file, 'iterations_unsteady', num_iters_unsteady) ! unsteady-state
-    if (num_iters_unsteady == huge(0)) then
-      call error_abort("No value assigned to num_iters.")
-    end if
-
-    call get_value(config_file, 'dt', dt)
-    if (dt == huge(0.0)) then
-      call error_abort("No value assigned to dt.")
-    end if
+      call get_value(config_file, 'dt', dt)
+      if (dt == huge(0.0)) then
+        call error_abort("No value assigned to dt.")
+      end if
+    end if 
+    
 
     if (cps == huge(0)) then ! cps was not set on the command line
       call get_value(config_file, 'cps', cps)
@@ -405,9 +402,9 @@ contains
     print *, "******************************************************************************"
     print *, "* SIMULATION LENGTH"
     if (unsteady) then
-      print *, "* Running for ", num_steps, "timesteps and ", num_iters_unsteady, "iterations"
+      print *, "* Running for ", num_steps, "timesteps and ", num_iters, "iterations"
     else
-      print *, "* Running for ", num_iters_steady, "iterations"
+      print *, "* Running for ", num_iters, "iterations"
     end if 
     write (*, '(1x,a,e10.3)') "* Time step size: ", dt
     print *, "******************************************************************************"

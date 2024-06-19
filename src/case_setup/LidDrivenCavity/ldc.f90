@@ -9,10 +9,10 @@ program ldc
   use petscsys
 
   use ccs_base, only: mesh
-  use case_config, only: num_iters, cps, domain_size, case_name, &
+  use case_config, only: num_steps, num_iters_steady, num_iters_unsteady, dt, cps, domain_size, case_name, &
                          velocity_relax, pressure_relax, res_target, &
                          write_gradients, velocity_solver_method_name, velocity_solver_precon_name, &
-                         pressure_solver_method_name, pressure_solver_precon_name, restart
+                         pressure_solver_method_name, pressure_solver_precon_name, restart, unsteady, write_frequency
   use constants, only: cell, face, ccsconfig, ccs_string_len, &
                        cell_centred_central, cell_centred_upwind, face_centred, &
                        ccs_split_type_shared, ccs_split_type_low_high
@@ -58,7 +58,7 @@ program ldc
 
   integer(ccs_int) :: n_boundaries
 
-  integer(ccs_int) :: it_start, it_end
+  integer(ccs_int) :: it_start, it_end_steady, it_end_unsteady
   integer(ccs_int) :: irank ! MPI rank ID
   integer(ccs_int) :: isize ! Size of MPI world
 
@@ -77,6 +77,9 @@ program ldc
   logical :: use_mpi_splitting
 
   character(len=128), dimension(:), allocatable :: bnd_names
+
+  integer(ccs_int):: t          ! Timestep counter
+  integer(ccs_int):: timer_index_io_sol
   
   ! Launch MPI
   call initialise_parallel_environment(par_env)
@@ -115,7 +118,9 @@ program ldc
 
   ! Set start and end iteration numbers (read from input file)
   it_start = 1
-  it_end = num_iters
+  it_end_steady = num_iters_steady
+  it_end_unsteady = num_iters_unsteady
+
 
   ! Create a mesh
   if (irank == par_env%root) print *, "Building mesh"
@@ -214,18 +219,46 @@ program ldc
   end if
 
   call timer_stop(timer_index_init)
-  call timer_register_start("Solver time inc I/O", timer_index_sol)
-  ! Solve using SIMPLE algorithm
-  if (irank == par_env%root) print *, "Start SIMPLE"
-  call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
+  call timer_register("I/O time for solution", timer_index_io_sol)
+
+  if (unsteady) then
+    print*, "unsteady-state activated"
+    do t = 1, num_steps
+      call timer_register_start("Solver time inc I/O", timer_index_sol)
+      ! Solve using SIMPLE algorithm
+      if (irank == par_env%root) print *, "Start SIMPLE"
+      call solve_nonlinear(par_env, mesh, it_start, it_end_unsteady, res_target, &
                        flow_fields)
   
-  ! Write out mesh and solution
-  call write_mesh(par_env, case_path, mesh)
-  
-  call write_solution(par_env, case_path, mesh, flow_fields)
+      ! Write out mesh and solution
+      call write_mesh(par_env, case_path, mesh)
+      if (par_env%proc_id == par_env%root) then
+        print *, "TIME = ", t
+      end if
 
-  call timer_stop(timer_index_sol)
+      if ((t == 1) .or. (t == num_steps) .or. (mod(t, write_frequency) == 0)) then
+        call timer_start(timer_index_io_sol)
+        call write_solution(par_env, case_path, mesh, flow_fields, t, num_steps, dt)
+        call timer_stop(timer_index_io_sol)
+      end if
+
+      call timer_stop(timer_index_sol)
+    end do
+  else 
+    print*, "steady-state activated"
+    call timer_register_start("Solver time inc I/O", timer_index_sol)
+    ! Solve using SIMPLE algorithm
+    if (irank == par_env%root) print *, "Start SIMPLE"
+    call solve_nonlinear(par_env, mesh, it_start, it_end_steady, res_target, &
+                       flow_fields)
+  
+    ! Write out mesh and solution
+    call write_mesh(par_env, case_path, mesh)
+  
+    call write_solution(par_env, case_path, mesh, flow_fields)
+
+    call timer_stop(timer_index_sol)
+  end if 
 
   ! Clean-up
   call dealloc_fluid_fields(flow_fields)
@@ -268,8 +301,10 @@ contains
 
     call get_value(config_file, 'restart', restart)
 
-    call get_value(config_file, 'iterationsSteady', num_iters)
-    if (num_iters == huge(0)) then
+    call get_value(config_file, 'unsteady', unsteady)
+
+    call get_value(config_file, 'iterations_steady', num_iters_steady) ! steady-state
+    if (num_iters_steady == huge(0)) then
       call error_abort("No value assigned to num_iters.")
     end if
 
@@ -278,8 +313,8 @@ contains
       call error_abort("No value assigned to num_steps.")
     end if
 
-    call get_value(config_file, 'iterationsUnsteady', num_iters)
-    if (num_iters == huge(0)) then
+    call get_value(config_file, 'iterations_unsteady', num_iters_unsteady) ! unsteady-state
+    if (num_iters_unsteady == huge(0)) then
       call error_abort("No value assigned to num_iters.")
     end if
 
@@ -287,6 +322,7 @@ contains
     if (dt == huge(0.0)) then
       call error_abort("No value assigned to dt.")
     end if
+
 
     if (cps == huge(0)) then ! cps was not set on the command line
       call get_value(config_file, 'cps', cps)
@@ -327,7 +363,12 @@ contains
     print *, " "
     print *, "******************************************************************************"
     print *, "* SIMULATION LENGTH"
-    print *, "* Running for ", num_iters, "iterations"
+    if (unsteady) then
+      print *, "* Running for ", num_steps, "timesteps and ", num_iters_unsteady, "iterations"
+    else
+      print *, "* Running for ", num_iters_steady, "iterations"
+    end if 
+
     print *, "******************************************************************************"
     print *, "* MESH SIZE"
     print *, "* Cells per side: ", cps
