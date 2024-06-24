@@ -9,7 +9,7 @@ module poiseuille_core
   use case_config, only: num_steps, num_iters, dt, cps, domain_size, write_frequency, &
                          velocity_relax, pressure_relax, res_target, case_name, &
                          write_gradients, velocity_solver_method_name, velocity_solver_precon_name, &
-                         pressure_solver_method_name, pressure_solver_precon_name, restart
+                         pressure_solver_method_name, pressure_solver_precon_name, restart, unsteady
   use constants, only: cell, face, ccsconfig, ccs_string_len, geoext, adiosconfig, ndim, &
                        cell_centred_central, cell_centred_upwind, face_centred
   use kinds, only: ccs_real, ccs_int, ccs_long
@@ -92,6 +92,9 @@ module poiseuille_core
     type(fluid) :: flow_fields
 
     character(len=128), dimension(:), allocatable :: bnd_names
+    
+    integer(ccs_int):: t          ! Timestep counter
+    integer(ccs_int):: timer_index_io_sol
     
     call timer_init()
     irank = par_env%proc_id
@@ -244,35 +247,75 @@ module poiseuille_core
     nullify(density)
 
     call timer_stop(timer_index_init)
-    call timer_register_start("Solver time inc I/O", timer_index_sol)
 
     if(restart) then
       print*, "restart capability activated"
       call read_solution(par_env, case_path, mesh, flow_fields)
     end if 
 
-    call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
+    if (unsteady) then
+      print*, "unsteady-state activated"
+      do t = 1, num_steps
+        call timer_register_start("Solver time inc I/O", timer_index_sol)
+        call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
                           flow_fields)
 
-    ! This could be a postprocessing subroutine
-    call get_field(flow_fields, "u", u)
-    call get_field(flow_fields, "v", v)
-    call get_field(flow_fields, "w", w)
-    call get_field(flow_fields, "p", p)
-    call calc_kinetic_energy(par_env, u, v, w)
-    call calc_enstrophy(par_env, u, v, w)
+        ! This could be a postprocessing subroutine
+        call get_field(flow_fields, "u", u)
+        call get_field(flow_fields, "v", v)
+        call get_field(flow_fields, "w", w)
+        call get_field(flow_fields, "p", p)
+        call calc_kinetic_energy(par_env, u, v, w)
+        call calc_enstrophy(par_env, u, v, w)
 
-    call calc_error(par_env, u, v, p, error_L2, error_Linf)
-    nullify(u)
-    nullify(v)
-    nullify(w)
-    nullify(p)
-    nullify(mf)
+        call calc_error(par_env, u, v, p, error_L2, error_Linf)
+        nullify(u)
+        nullify(v)
+        nullify(w)
+        nullify(p)
+        nullify(mf)
 
-    call write_solution(par_env, case_path, mesh, flow_fields)
+        if (par_env%proc_id == par_env%root) then
+          print *, "TIME = ", t
+        end if
 
-    call timer_stop(timer_index_sol)
+        if ((t == 1) .or. (t == num_steps) .or. (mod(t, write_frequency) == 0)) then
+          call timer_start(timer_index_io_sol)
+          call write_solution(par_env, case_path, mesh, flow_fields, t, num_steps, dt)
+          call timer_stop(timer_index_io_sol)
+        end if
 
+        call timer_stop(timer_index_sol)
+      end do
+    else
+      print*, "steady-state activated"
+      call timer_register_start("Solver time inc I/O", timer_index_sol)
+      call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
+                          flow_fields)
+
+      ! This could be a postprocessing subroutine
+      call get_field(flow_fields, "u", u)
+      call get_field(flow_fields, "v", v)
+      call get_field(flow_fields, "w", w)
+      call get_field(flow_fields, "p", p)
+      call calc_kinetic_energy(par_env, u, v, w)
+      call calc_enstrophy(par_env, u, v, w)
+
+      call calc_error(par_env, u, v, p, error_L2, error_Linf)
+      nullify(u)
+      nullify(v)
+      nullify(w)
+      nullify(p)
+      nullify(mf)
+
+      call write_solution(par_env, case_path, mesh, flow_fields)
+
+      call timer_stop(timer_index_sol)
+
+    end if 
+
+    
+    
     ! Clean-up
 
     call timer_stop(timer_index_total)
@@ -316,6 +359,8 @@ module poiseuille_core
     end if
 
     call get_value(config_file, 'restart', restart)
+
+    call get_value(config_file, 'unsteady', unsteady)
 
     call get_value(config_file, 'steps', num_steps)
     if (num_steps == huge(0)) then
