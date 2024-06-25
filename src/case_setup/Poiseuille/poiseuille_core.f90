@@ -362,9 +362,21 @@ module poiseuille_core
 
     call get_value(config_file, 'unsteady', unsteady)
 
-    call get_value(config_file, 'steps', num_steps)
-    if (num_steps == huge(0)) then
-      call error_abort("No value assigned to num_steps.")
+    if (unsteady) then
+      call get_value(config_file, 'steps', num_steps)
+      if (num_steps == huge(0)) then
+        call error_abort("No value assigned to num_steps.")
+      end if
+
+      call get_value(config_file, 'dt', dt)
+      if (dt == huge(0.0)) then
+        call error_abort("No value assigned to dt.")
+      end if
+
+      call get_value(config_file, 'write_frequency', write_frequency)
+      if (write_frequency == huge(0.0)) then
+        call error_abort("No value assigned to write_frequency.")
+      end if
     end if
 
     call get_value(config_file, 'iterations', num_iters)
@@ -372,21 +384,11 @@ module poiseuille_core
       call error_abort("No value assigned to num_iters.")
     end if
 
-    call get_value(config_file, 'dt', dt)
-    if (dt == huge(0.0)) then
-      call error_abort("No value assigned to dt.")
-    end if
-
     if (cps == huge(0)) then ! cps was not set on the command line
       call get_value(config_file, 'cps', cps)
       if (cps == huge(0)) then
         call error_abort("No value assigned to cps.")
       end if
-    end if
-
-    call get_value(config_file, 'write_frequency', write_frequency)
-    if (write_frequency == huge(0.0)) then
-      call error_abort("No value assigned to write_frequency.")
     end if
 
     call get_value(config_file, 'L', domain_size)
@@ -421,8 +423,12 @@ module poiseuille_core
     print *, " "
     print *, "******************************************************************************"
     print *, "* SIMULATION LENGTH"
-    print *, "* Running for ", num_steps, "timesteps and ", num_iters, "iterations"
-    write (*, '(1x,a,e10.3)') "* Time step size: ", dt
+    if (unsteady) then
+      print *, "* Running for ", num_steps, "timesteps and ", num_iters, "iterations"
+      write (*, '(1x,a,e10.3)') "* Time step size: ", dt
+    else
+      print *, "* Running for ", num_iters, "iterations"
+    end if     
     print *, "******************************************************************************"
     print *, "* MESH SIZE"
     if (cps /= huge(0)) then

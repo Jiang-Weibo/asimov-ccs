@@ -316,6 +316,11 @@ contains
       if (dt == huge(0.0)) then
         call error_abort("No value assigned to dt.")
       end if
+
+      call get_value(config_file, 'write_frequency', write_frequency)
+      if (write_frequency == huge(0.0)) then
+        call error_abort("No value assigned to write_frequency.")
+      end if
     end if 
     
     if (cps == huge(0)) then ! cps was not set on the command line
@@ -359,6 +364,7 @@ contains
     print *, "* SIMULATION LENGTH"
     if (unsteady) then
       print *, "* Running for ", num_steps, "timesteps and ", num_iters, "iterations"
+      write (*, '(1x, a, e10.3)') "* Time step size: ", dt
     else
       print *, "* Running for ", num_iters, "iterations"
     end if 

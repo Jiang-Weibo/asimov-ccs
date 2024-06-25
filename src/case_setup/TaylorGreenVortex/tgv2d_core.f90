@@ -293,9 +293,6 @@ contains
       call write_solution(par_env, case_path, mesh, flow_fields)
     end if
 
-
-    
-
     ! Clean-up
 
     call reset_timestepping()
@@ -356,6 +353,11 @@ contains
       if (dt == huge(0.0)) then
         call error_abort("No value assigned to dt.")
       end if
+
+      call get_value(config_file, 'write_frequency', write_frequency)
+      if (write_frequency == huge(0.0)) then
+        call error_abort("No value assigned to write_frequency.")
+      end if
     end if 
     
 
@@ -403,10 +405,10 @@ contains
     print *, "* SIMULATION LENGTH"
     if (unsteady) then
       print *, "* Running for ", num_steps, "timesteps and ", num_iters, "iterations"
+      write (*, '(1x,a,e10.3)') "* Time step size: ", dt
     else
       print *, "* Running for ", num_iters, "iterations"
     end if 
-    write (*, '(1x,a,e10.3)') "* Time step size: ", dt
     print *, "******************************************************************************"
     print *, "* MESH SIZE"
     print *, "* Cells per side: ", cps

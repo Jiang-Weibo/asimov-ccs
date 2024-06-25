@@ -390,6 +390,11 @@ contains
       if (dt == huge(0.0)) then
         call error_abort("No value assigned to dt.")
       end if
+
+      call get_value(config_file, 'write_frequency', write_frequency)
+      if (write_frequency == huge(0.0)) then
+        call error_abort("No value assigned to write_frequency.")
+      end if
     end if 
     
 
@@ -398,11 +403,6 @@ contains
       if (cps == huge(0)) then
         call error_abort("No value assigned to cps.")
       end if
-    end if
-
-    call get_value(config_file, 'write_frequency', write_frequency)
-    if (write_frequency == huge(0.0)) then
-      call error_abort("No value assigned to write_frequency.")
     end if
 
     call get_value(config_file, 'L', domain_size)
@@ -444,10 +444,10 @@ contains
     print *, "* SIMULATION LENGTH"
     if (unsteady) then
       print *, "* Running for ", num_steps, "timesteps and ", num_iters, "iterations"
+      write (*, '(1x, a, e10.3)') "* Time step size: ", dt
     else
       print *, "* Running for ", num_iters, "iterations"
     end if 
-    write (*, '(1x, a, e10.3)') "* Time step size: ", dt
     print *, "******************************************************************************"
     print *, "* MESH SIZE"
     if (cps /= huge(0)) then
