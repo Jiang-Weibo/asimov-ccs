@@ -2,7 +2,10 @@
 title: scalar_advection_poisson
 
 # restart capability
-restart: false  
+restart: false 
+
+# unstaedy state
+unsteady: true
 
 #  number of timesteps
 steps: 100
