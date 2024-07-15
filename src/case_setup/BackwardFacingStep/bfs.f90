@@ -239,28 +239,28 @@ program bfs
     call read_solution(par_env, case_path, mesh, flow_fields)
   end if 
 
-  if (unsteady) then
-    print*, "unsteady-state activated"
-    do t = 1, num_steps
-      call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
-                           flow_fields)
-      if (par_env%proc_id == par_env%root) then
-        print *, "TIME = ", t
-      end if
-  
-      if ((t == 1) .or. (t == num_steps) .or. (mod(t, write_frequency) == 0)) then
-        call write_solution(par_env, case_path, mesh, flow_fields, t, num_steps, dt)
-      end if
-    end do
-  else
+  if(.not.unsteady) then
+    num_steps = 1
     print*, "steady-state activated"
+  else
+    print*, "unsteady-state activated"
+  end if
+
+  do t = 1, num_steps
     call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
-    flow_fields)
+                         flow_fields)
     if (par_env%proc_id == par_env%root) then
       print *, "TIME = ", t
     end if
-    call write_solution(par_env, case_path, mesh, flow_fields)
-  end if
+
+    if(.not. unsteady) then
+      call write_solution(par_env, case_path, mesh, flow_fields)
+    else
+      if ((t == 1) .or. (t == num_steps) .or. (mod(t, write_frequency) == 0)) then
+        call write_solution(par_env, case_path, mesh, flow_fields, t, num_steps, dt)
+      end if
+    end if 
+  end do
 
   ! Clean-up
 
