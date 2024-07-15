@@ -4,15 +4,15 @@ title: LidDrivenCavity
 restart: false
 
 # unstaedy state
-unsteady: true
+unsteady: false
 
 #  number of steady iterations
-iterations: 100
+iterations: 5
 
 #  number of timesteps
-steps: 5
+steps: 100
 # time step size
-dt: 0.01
+dt: 8.0e-1
 
 # Frequency (in terms of timesteps) of writing solution to file
 write_frequency: 5

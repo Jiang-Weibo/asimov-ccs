@@ -76,7 +76,7 @@ contains
   end subroutine set_vector_values_entry
 
   !> Generic implementation to get vector data in natural ordering
-  module subroutine get_natural_data_vec(par_env, mesh, v, data) !global to natural
+  module subroutine get_natural_data_vec(par_env, mesh, v, data) 
 
     class(parallel_environment), intent(in) :: par_env
     type(ccs_mesh), intent(in) :: mesh
@@ -107,7 +107,7 @@ contains
   end subroutine get_natural_data_vec
 
   !> Generic implementation to get vector data in global ordering
-  module subroutine get_global_data_vec(par_env, mesh, v, data) !natural to global
+  module subroutine get_global_data_vec(par_env, mesh, v, data) !natural -> global
 
     class(parallel_environment), intent(in) :: par_env
     type(ccs_mesh), intent(in) :: mesh
@@ -142,9 +142,7 @@ contains
         call get_global_index(loc_p, global_index_p)
         nat_glob_data(natural_index_p)=global_index_p
       end do
-      !----------need to add select for parallel environment and default case
-      ! DO mpi all reduce
-      !MPI_Allreduce(MPI_SUM)
+      
       select type (par_env)
       type is (parallel_environment_mpi)
         call MPI_Allreduce(MPI_IN_PLACE, nat_glob_data, global_num_cells, MPI_integer, MPI_SUM, par_env%comm, ierr)
@@ -159,8 +157,6 @@ contains
       call restore_vector_data(v, vec_data)
 
     end associate
-    
-    
 
   end subroutine get_global_data_vec
 

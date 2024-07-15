@@ -8,12 +8,12 @@ restart: false
 unsteady: true
 
 #  number of steady iterations
-iterations: 100
+iterations: 7
 
 #  number of timesteps
-steps: 5
+steps: 10
 # time step size
-dt: 0.01
+dt: 1.0e-2
 
 
 # Square/cubic mesh generation parameters

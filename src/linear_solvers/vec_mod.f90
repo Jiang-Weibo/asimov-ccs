@@ -209,7 +209,7 @@ module vec
       !< de/reallocated by this subroutine.
     end subroutine get_natural_data_vec
 
-        !> Interface to return the vector data in natural ordering
+    !> Interface to return the vector data in global ordering
     module subroutine get_global_data_vec(par_env, mesh, v, data)
       class(parallel_environment), intent(in) :: par_env
       type(ccs_mesh), intent(in) :: mesh

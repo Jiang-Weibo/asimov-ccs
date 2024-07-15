@@ -219,44 +219,38 @@ program ldc
   call timer_stop(timer_index_init)
   call timer_register("I/O time for solution", timer_index_io_sol)
 
-  if (unsteady) then
-    print*, "unsteady-state activated"
-    do t = 1, num_steps
-      call timer_register_start("Solver time inc I/O", timer_index_sol)
-      ! Solve using SIMPLE algorithm
-      if (irank == par_env%root) print *, "Start SIMPLE"
-      call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
-                       flow_fields)
-  
-      ! Write out mesh and solution
-      call write_mesh(par_env, case_path, mesh)
-      if (par_env%proc_id == par_env%root) then
-        print *, "TIME = ", t
-      end if
-
-      if ((t == 1) .or. (t == num_steps) .or. (mod(t, write_frequency) == 0)) then
-        call timer_start(timer_index_io_sol)
-        call write_solution(par_env, case_path, mesh, flow_fields, t, num_steps, dt)
-        call timer_stop(timer_index_io_sol)
-      end if
-
-      call timer_stop(timer_index_sol)
-    end do
-  else 
+  if(.not.unsteady) then
+    num_steps = 1
     print*, "steady-state activated"
+  else
+    print*, "unsteady-state activated"
+  end if
+
+  do t = 1, num_steps
     call timer_register_start("Solver time inc I/O", timer_index_sol)
     ! Solve using SIMPLE algorithm
     if (irank == par_env%root) print *, "Start SIMPLE"
     call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
-                       flow_fields)
-  
+                     flow_fields)
+
     ! Write out mesh and solution
     call write_mesh(par_env, case_path, mesh)
-  
-    call write_solution(par_env, case_path, mesh, flow_fields)
+    if (par_env%proc_id == par_env%root) then
+      print *, "TIME = ", t
+    end if
+
+    if ((t == 1) .or. (t == num_steps) .or. (mod(t, write_frequency) == 0)) then
+      if(.not. unsteady) then
+        call write_solution(par_env, case_path, mesh, flow_fields)
+      else 
+        call timer_start(timer_index_io_sol)
+        call write_solution(par_env, case_path, mesh, flow_fields, t, num_steps, dt)
+        call timer_stop(timer_index_io_sol)
+      end if 
+    end if
 
     call timer_stop(timer_index_sol)
-  end if 
+  end do
 
   ! Clean-up
   call dealloc_fluid_fields(flow_fields)
