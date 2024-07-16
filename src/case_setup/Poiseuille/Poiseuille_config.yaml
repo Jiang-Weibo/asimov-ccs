@@ -5,7 +5,7 @@ title: Poiseuille
 restart: false
 
 # unstaedy state
-unsteady: true
+unsteady: false
 
 #  number of steady iterations
 iterations: 4000
