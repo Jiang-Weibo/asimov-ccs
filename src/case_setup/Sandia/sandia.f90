@@ -256,40 +256,41 @@ program sandia
     call read_solution(par_env, case_path, mesh, flow_fields)
   end if 
 
-  if (unsteady) then
-    print*, "unsteady-state activated"
-    do t = 1, num_steps
-      call timer_start(timer_index_sol)
-      call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
-                           flow_fields, diverged)
-      if (par_env%proc_id == par_env%root) then
-        print *, "TIME = ", t
-      end if
-  
-      ! If a STOP file exist, write solution and exit the main simulation loop
-      if (query_stop_run(par_env) .or. diverged) then
-        call timer_start(timer_index_io_sol)
-        call write_solution(par_env, case_path, mesh, flow_fields, t, num_steps, dt)
-        call timer_stop(timer_index_io_sol)
-        exit
-      end if
-  
-      if ((t == 1) .or. (t == num_steps) .or. (mod(t, write_frequency) == 0)) then
-        call timer_start(timer_index_io_sol)
-        call write_solution(par_env, case_path, mesh, flow_fields, t, num_steps, dt)
-        call timer_stop(timer_index_io_sol)
-      end if
-      call timer_stop(timer_index_sol)
-    end do
-  else 
+  if(.not.unsteady) then
+    num_steps = 1
     print*, "steady-state activated"
+  else
+    print*, "unsteady-state activated"
+  end if
+
+  do t = 1, num_steps
     call timer_start(timer_index_sol)
     call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
-                           flow_fields, diverged)
-    call write_solution(par_env, case_path, mesh, flow_fields)
-    call timer_stop(timer_index_io_sol)
-  end if 
-  
+                         flow_fields, diverged)
+    if (par_env%proc_id == par_env%root) then
+      print *, "TIME = ", t
+    end if
+
+    ! If a STOP file exist, write solution and exit the main simulation loop
+    if (query_stop_run(par_env) .or. diverged) then
+      call timer_start(timer_index_io_sol)
+      call write_solution(par_env, case_path, mesh, flow_fields, t, num_steps, dt)
+      call timer_stop(timer_index_io_sol)
+      exit
+    end if
+
+    if ((t == 1) .or. (t == num_steps) .or. (mod(t, write_frequency) == 0)) then
+      if(.not. unsteady) then
+        call write_solution(par_env, case_path, mesh, flow_fields)
+      else
+        call timer_start(timer_index_io_sol)
+        call write_solution(par_env, case_path, mesh, flow_fields, t, num_steps, dt)
+        call timer_stop(timer_index_io_sol)
+      end if
+    end if
+    call timer_stop(timer_index_sol)
+  end do
+ 
   ! Clean-up
 
   call timer_stop(timer_index_total)
