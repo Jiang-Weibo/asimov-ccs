@@ -198,37 +198,32 @@ program scalar_transport
 
   call timer(init_time)
 
-  if (unsteady) then
-    print*, "unsteady-state activated"
-    ! Solve using SIMPLE algorithm
-    if (irank == par_env%root) print *, "Start scalar solver"
-    call write_mesh(par_env, case_path, mesh)
-    do t = 1, num_steps
-      call update_scalars(par_env, mesh, flow_fields)
-      if (par_env%proc_id == par_env%root) then
-        print *, "TIME = ", t, " / ", num_steps
-      end if
-  
-      if ((t == 1) .or. (t == num_steps) .or. (mod(t, write_frequency) == 0)) then
-        call write_solution(par_env, case_path, mesh, flow_fields, t, num_steps, dt)
-      end if
-  
-      call finalise_timestep()
-    end do
-  else 
+  if(.not.unsteady) then
+    num_steps = 1
     print*, "steady-state activated"
-    ! Solve using SIMPLE algorithm
-    if (irank == par_env%root) print *, "Start scalar solver"
-    call write_mesh(par_env, case_path, mesh)
-    call write_solution(par_env, case_path, mesh, flow_fields)
+  else
+    print*, "unsteady-state activated"
   end if
 
-  
+  ! Solve using SIMPLE algorithm
+  if (irank == par_env%root) print *, "Start scalar solver"
+  do t = 1, num_steps
+    call write_mesh(par_env, case_path, mesh)
+    call update_scalars(par_env, mesh, flow_fields)
+    if (par_env%proc_id == par_env%root) then
+      print *, "TIME = ", t, " / ", num_steps
+    end if
 
-  ! ! Write out mesh and solution
-  !call write_mesh(par_env, case_path, mesh)
-  !call write_solution(par_env, case_path, mesh, flow_fields, 0, num_steps, dt)
-  
+    if ((t == 1) .or. (t == num_steps) .or. (mod(t, write_frequency) == 0)) then
+      if(.not. unsteady) then
+        call write_solution(par_env, case_path, mesh, flow_fields)
+      else
+        call write_solution(par_env, case_path, mesh, flow_fields, t, num_steps, dt)
+      end if 
+    end if
+
+    call finalise_timestep()
+  end do
 
   ! Clean-up
   call dealloc_fluid_fields(flow_fields)
