@@ -237,36 +237,34 @@ program scalar_advection
   if (irank == par_env%root) print *, "Solve"
   call get_field(flow_fields, "scalar", scalar)
 
-  if(unsteady) then
-    print*, "unsteady-state activated"
-    do t = 1, num_steps
-      call timer_register_start("Solver time inc I/O", timer_index_sol)
-      call set_equation_system(par_env, source, scalar%values, M, scalar_equation_system)
-      call create_solver(scalar_equation_system, scalar_solver)
-      call solve(scalar_solver)
-      nullify(scalar)
-
-      if ((t == 1) .or. (t == num_steps) .or. (mod(t, write_frequency) == 0)) then
-        call timer_start(timer_index_io_sol)
-        !call write_mesh(par_env, case_path, mesh)
-        call write_solution(par_env, case_path, mesh, flow_fields, t, num_steps, dt)
-        call timer_stop(timer_index_io_sol)
-      end if 
-      call timer_stop(timer_index_sol)
-
-    end do
-  else
+  if(.not.unsteady) then
+    num_steps = 1
     print*, "steady-state activated"
+  else
+    print*, "unsteady-state activated"
+  end if
+
+  do t = 1, num_steps
     call timer_register_start("Solver time inc I/O", timer_index_sol)
     call set_equation_system(par_env, source, scalar%values, M, scalar_equation_system)
     call create_solver(scalar_equation_system, scalar_solver)
     call solve(scalar_solver)
     nullify(scalar)
 
-    !call write_mesh(par_env, case_path, mesh)
-    call write_solution(par_env, case_path, mesh, flow_fields)
+    if ((t == 1) .or. (t == num_steps) .or. (mod(t, write_frequency) == 0)) then
+      if(.not. unsteady) then
+        call write_solution(par_env, case_path, mesh, flow_fields)
+      else
+        call timer_start(timer_index_io_sol)
+        !call write_mesh(par_env, case_path, mesh)
+        call write_solution(par_env, case_path, mesh, flow_fields, t, num_steps, dt)
+        call timer_stop(timer_index_io_sol)
+      end if 
+    end if 
+
     call timer_stop(timer_index_sol)
-  end if
+
+  end do
 
   ! Clean up
   deallocate(source)
