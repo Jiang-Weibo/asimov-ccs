@@ -268,48 +268,18 @@ program tgv
   call timer_register("I/O time for solution", timer_index_io_sol)
   call timer_register("Solver time inc I/O", timer_index_sol)
 
-  if (unsteady) then
-    print*, "unsteady-state activated"
-    do t = 1, num_steps
-      call timer_start(timer_index_sol)
-      call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
-                           flow_fields)
-  
-      call get_field(flow_fields, "u", u)
-      call get_field(flow_fields, "v", v)
-      call get_field(flow_fields, "w", w)
-      call calc_kinetic_energy(par_env, u, v, w)
-      call calc_enstrophy(par_env, u, v, w)
-      nullify(u)
-      nullify(v)
-      nullify(w)
-  
-      if (par_env%proc_id == par_env%root) then
-        print *, "TIME = ", t
-      end if
-  
-      ! If a STOP file exist, write solution and exit the main simulation loop
-      if (query_stop_run(par_env) .eqv. .true.) then
-        call timer_start(timer_index_io_sol)
-        call write_solution(par_env, case_path, mesh, flow_fields, t, num_steps, dt)
-        call timer_stop(timer_index_io_sol)
-        call dprint("STOP file found. Writing output and ending simulation.")
-        exit
-      end if
-  
-      if ((t == 1) .or. (t == num_steps) .or. (mod(t, write_frequency) == 0)) then
-        call timer_start(timer_index_io_sol)
-        call write_solution(par_env, case_path, mesh, flow_fields, t, num_steps, dt)
-        call timer_stop(timer_index_io_sol)
-      end if
-  
-      call timer_stop(timer_index_sol)
-    end do  
-  else 
+  if(.not.unsteady) then
+    num_steps = 1
     print*, "steady-state activated"
+  else
+    print*, "unsteady-state activated"
+  end if
+
+  do t = 1, num_steps
+    call timer_start(timer_index_sol)
     call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
-                           flow_fields)
-  
+                         flow_fields)
+
     call get_field(flow_fields, "u", u)
     call get_field(flow_fields, "v", v)
     call get_field(flow_fields, "w", w)
@@ -319,8 +289,31 @@ program tgv
     nullify(v)
     nullify(w)
 
-    call write_solution(par_env, case_path, mesh, flow_fields)
-  end if 
+    if (par_env%proc_id == par_env%root) then
+      print *, "TIME = ", t
+    end if
+
+    ! If a STOP file exist, write solution and exit the main simulation loop
+    if (query_stop_run(par_env) .eqv. .true.) then
+      call timer_start(timer_index_io_sol)
+      call write_solution(par_env, case_path, mesh, flow_fields, t, num_steps, dt)
+      call timer_stop(timer_index_io_sol)
+      call dprint("STOP file found. Writing output and ending simulation.")
+      exit
+    end if
+
+    if ((t == 1) .or. (t == num_steps) .or. (mod(t, write_frequency) == 0)) then
+      if(.not. unsteady) then
+        call write_solution(par_env, case_path, mesh, flow_fields)
+      else
+        call timer_start(timer_index_io_sol)
+        call write_solution(par_env, case_path, mesh, flow_fields, t, num_steps, dt)
+        call timer_stop(timer_index_io_sol)
+      end if
+    end if
+
+    call timer_stop(timer_index_sol)
+  end do  
 
   ! Clean-up
   nullify(u)
