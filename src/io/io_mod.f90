@@ -128,7 +128,6 @@ module io
 
     !> Read a 1D 32-bit integer array from file
     module subroutine read_array_int32_1D(io_proc, var_name, global_start, count, var, step)
-      !call read_array(sol_reader, data_name, sel_shape, sel_start, sel_count, data, steps)
       class(io_process), intent(in) :: io_proc                 !< IO process used for reading
       character(len=*), intent(in) :: var_name                 !< Name of integer array to read
       integer(int64), dimension(1), intent(in) :: global_start !< What global index to start reading from
