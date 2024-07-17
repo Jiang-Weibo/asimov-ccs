@@ -24,7 +24,7 @@ module tgv2d_core
   use parallel_types, only: parallel_environment
   use meshing, only: get_global_num_cells, set_mesh_object, nullify_mesh_object, get_local_num_cells
   use mesh_utils, only: build_square_mesh, write_mesh
-  use vec, only: set_vector_location, get_vector_data, restore_vector_data
+  use vec, only: set_vector_location
   use petsctypes, only: vector_petsc
   use pv_coupling, only: solve_nonlinear
   use utils, only: set_size, initialise, update, exit_print, calc_kinetic_energy, calc_enstrophy, &
@@ -242,7 +242,9 @@ contains
     nullify(density)
 
     if(restart) then
-      print*, "restart capability activated"
+      if (is_root(par_env)) then
+        print*, "restart capability activated"
+      end if
       call read_solution(par_env, case_path, mesh, flow_fields)
     end if 
     

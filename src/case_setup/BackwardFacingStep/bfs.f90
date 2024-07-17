@@ -25,7 +25,7 @@ program bfs
                       read_command_line_arguments, sync, &
                       create_new_par_env, is_root
   use parallel_types, only: parallel_environment
-  use vec, only: create_vector, set_vector_location, get_vector_data, restore_vector_data
+  use vec, only: create_vector, set_vector_location
   use petsctypes, only: vector_petsc
   use pv_coupling, only: solve_nonlinear
   use utils, only: set_size, initialise, update, exit_print, &
@@ -37,10 +37,10 @@ program bfs
                          get_store_residuals, get_enable_cell_corrections, get_variable_types
   use timestepping, only: set_timestep, activate_timestepping, initialise_old_values
   use mesh_utils, only: read_mesh, write_mesh
-  use meshing, only: set_mesh_object, nullify_mesh_object, get_local_num_cells
+  use meshing, only: set_mesh_object, nullify_mesh_object
   use partitioning, only: compute_partitioner_input, &
                           partition_kway, compute_connectivity
-  use io_visualisation, only: write_solution, read_solution
+  use io_visualisation, only: write_solution
   use fv, only: update_gradient
   use utils, only: str
 

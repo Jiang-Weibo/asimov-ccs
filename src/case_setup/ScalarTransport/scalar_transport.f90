@@ -185,7 +185,9 @@ program scalar_transport
   end do
 
   if(restart) then
-    print*, "restart capability activated"
+    if (is_root(par_env)) then
+      print*, "restart capability activated"
+    end if
     call read_solution(par_env, case_path, mesh, flow_fields)
   end if 
 

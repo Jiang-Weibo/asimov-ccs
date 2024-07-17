@@ -25,7 +25,7 @@ program sandia
                       cleanup_parallel_environment, timer, &
                       read_command_line_arguments, sync, query_stop_run, create_new_par_env, is_root
   use parallel_types, only: parallel_environment
-  use vec, only: create_vector, set_vector_location, get_vector_data, restore_vector_data
+  use vec, only: create_vector, set_vector_location
   use petsctypes, only: vector_petsc
   use pv_coupling, only: solve_nonlinear
   use scalars, only: update_scalars
@@ -252,7 +252,9 @@ program sandia
   call timer_register("Solver time inc I/O", timer_index_sol)
 
   if(restart) then
-    print*, "restart capability activated"
+    if (is_root(par_env)) then
+      print*, "restart capability activated"
+    end if
     call read_solution(par_env, case_path, mesh, flow_fields)
   end if 
 
@@ -317,6 +319,7 @@ contains
        call error_abort("The number of variable types does not match the number of named variables")
     end if
 
+    call get_value(config_file, 'restart', restart)
 
     call get_value(config_file, 'steps', num_steps)
     if (num_steps == huge(0)) then
