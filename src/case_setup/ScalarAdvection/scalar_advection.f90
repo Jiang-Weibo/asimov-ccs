@@ -17,15 +17,15 @@ program scalar_advection
   use constants, only: cell, face, ccsconfig, ccs_string_len, geoext, adiosconfig, ndim, &
                        cell_centred_central, cell_centred_upwind, face_centred, &
                        ccs_split_type_shared, ccs_split_type_low_high, ccs_split_undefined
-  use meshing, only: get_boundary_status, create_face_locator, get_total_num_cells, get_global_num_cells, get_local_num_cells
+  use meshing, only: get_boundary_status, create_face_locator, get_total_num_cells, get_global_num_cells
   use fields, only: create_field, set_field_config_file, set_field_n_boundaries, set_field_name, &
        set_field_type, set_field_vector_properties, set_field_enable_cell_corrections
   use fortran_yaml_c_interface, only: parse
-  use vec, only: create_vector, set_vector_location, get_vector_data, restore_vector_data
+  use vec, only: create_vector, set_vector_location
   use mat, only: create_matrix, set_nnz
   use solver, only: create_solver, solve, set_equation_system
   use utils, only: update, initialise, set_size, add_field_to_outputlist, exit_print, finalise, zero, &
-                   get_field, get_field
+                   get_field
   use mesh_utils, only: build_square_mesh, write_mesh, compute_face_interpolation
   use meshing, only: set_mesh_object, nullify_mesh_object
   use parallel_types, only: parallel_environment
@@ -229,7 +229,9 @@ program scalar_advection
   call finalise(M)
 
   if(restart) then
-    print*, "restart capability activated"
+    if (is_root(par_env)) then
+      print*, "restart capability activated"
+    end if
     call read_solution(par_env, case_path, mesh, flow_fields)
   end if 
 

@@ -23,7 +23,7 @@ module poiseuille_core
                       cleanup_parallel_environment, timer, &
                       read_command_line_arguments, sync, is_root
   use parallel_types, only: parallel_environment
-  use vec, only: create_vector, set_vector_location, get_vector_data, restore_vector_data
+  use vec, only: create_vector, set_vector_location
   use petsctypes, only: vector_petsc
   use pv_coupling, only: solve_nonlinear
   use utils, only: set_size, initialise, update, exit_print, &
@@ -44,7 +44,6 @@ module poiseuille_core
   use utils, only: str
   use timers, only: timer_init, timer_register_start, timer_register, timer_start, timer_stop, &
                     timer_print, timer_get_time, timer_print_all, timer_reset
-  use vec, only: get_vector_data, restore_vector_data
 
   implicit none
 
@@ -249,7 +248,9 @@ module poiseuille_core
     call timer_stop(timer_index_init)
 
     if(restart) then
-      print*, "restart capability activated"
+      if (is_root(par_env)) then
+        print*, "restart capability activated"
+      end if
       call read_solution(par_env, case_path, mesh, flow_fields)
     end if 
 

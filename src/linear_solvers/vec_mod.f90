@@ -215,7 +215,7 @@ module vec
       type(ccs_mesh), intent(in) :: mesh
       class(ccs_vector), intent(inout) :: v
       real(ccs_real), dimension(:), allocatable, intent(out) :: data !< The returned vector data in
-      !< natural ordering. Note the use
+      !< global ordering. Note the use
       !< of allocatable + intent(out),
       !< this ensures it will be
       !< de/reallocated by this subroutine.

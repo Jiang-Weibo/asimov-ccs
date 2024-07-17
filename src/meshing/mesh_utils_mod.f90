@@ -167,7 +167,7 @@ contains
     call set_offsets(shared_env, mesh)
 
     call timer_start(timer_read_geo)
-    call read_geometry(shared_env, reader_env, geo_reader, mesh) 
+    call read_geometry(shared_env, reader_env, geo_reader, mesh)
     call timer_stop(timer_read_geo)
 
     ! Close the file and ADIOS2 engine

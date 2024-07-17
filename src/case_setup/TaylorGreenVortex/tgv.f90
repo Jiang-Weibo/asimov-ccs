@@ -15,7 +15,7 @@ program tgv
   use constants, only: cell, face, ccsconfig, ccs_string_len, geoext, adiosconfig, ndim, &
                        cell_centred_central, cell_centred_upwind, face_centred
   use constants, only: ccs_split_type_shared, ccs_split_type_low_high, ccs_split_undefined
-  use meshing, only: set_mesh_object, nullify_mesh_object, get_local_num_cells
+  use meshing, only: set_mesh_object, nullify_mesh_object
   use fields, only: create_field, set_field_config_file, set_field_n_boundaries, set_field_name, &
                     set_field_type, set_field_vector_properties, set_field_store_residuals, set_field_enable_cell_corrections
   use fortran_yaml_c_interface, only: parse
@@ -43,7 +43,7 @@ program tgv
                    add_field_to_outputlist, get_field, add_field, &
                    set_is_field_solved, &
                    allocate_fluid_fields, str, debug_print
-  use vec, only: create_vector, set_vector_location, get_vector_data, restore_vector_data
+  use vec, only: create_vector, set_vector_location
   use timers, only: timer_init, timer_register_start, timer_register, timer_start, timer_stop, timer_print, &
                     timer_get_time, timer_print_all, timer_export_csv
 
@@ -260,7 +260,9 @@ program tgv
   nullify(density)
 
   if(restart) then
-    print*, "restart capability activated"
+    if (is_root(par_env)) then
+      print*, "restart capability activated"
+    end if
     call read_solution(par_env, case_path, mesh, flow_fields)
   end if 
 

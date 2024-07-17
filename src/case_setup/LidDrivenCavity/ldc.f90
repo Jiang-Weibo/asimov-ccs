@@ -26,7 +26,7 @@ program ldc
                       create_new_par_env, &
                       cleanup_parallel_environment, timer, &
                       read_command_line_arguments, sync, is_root
-  use meshing, only: set_mesh_object, nullify_mesh_object, get_local_num_cells
+  use meshing, only: set_mesh_object, nullify_mesh_object
   use parallel_types, only: parallel_environment
   use mesh_utils, only: build_mesh, write_mesh, build_square_mesh
   use meshing, only: get_global_num_cells, get_local_num_cells
@@ -208,7 +208,9 @@ program ldc
   nullify(density)
 
   if(restart) then
-    print*, "restart capability activated"
+    if (is_root(par_env)) then
+      print*, "restart capability activated"
+    end if
     call read_solution(par_env, case_path, mesh, flow_fields)
   end if 
 

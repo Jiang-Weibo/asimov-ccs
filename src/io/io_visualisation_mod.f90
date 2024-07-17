@@ -3,7 +3,7 @@
 !  Provides an interface to visualisation-related IO functions.
 module io_visualisation
 
-  use types, only: io_environment, io_process, ccs_mesh, fluid, field_ptr
+  use types, only: io_environment, io_process, ccs_mesh, fluid
   use parallel_types, only: parallel_environment
   use kinds, only: ccs_int, ccs_real
 
