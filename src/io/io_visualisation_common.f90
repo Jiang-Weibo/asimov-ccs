@@ -62,7 +62,6 @@ contains
 
   end subroutine
 
-
   !> Write the flow solution for the current time-step to file
   module subroutine write_solution(par_env, case_name, mesh, flow, step, maxstep, dt)
 
