@@ -1,6 +1,9 @@
 ---
 title: TaylorGreenVortex2D
 
+# restart capability
+restart: false 
+
 #  number of timesteps
 steps: 5
 #  number of iterations

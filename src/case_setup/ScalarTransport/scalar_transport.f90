@@ -10,7 +10,7 @@ program scalar_transport
 
   use ccs_base, only: mesh
   use case_config, only: num_steps, num_iters, cps, domain_size, case_name, &
-                         res_target, write_gradients, dt, write_frequency
+                         res_target, write_gradients, dt, write_frequency, restart
   use constants, only: cell, face, ccsconfig, ccs_string_len, &
                        face_centred, cell_centred_central, cell_centred_upwind, &
                        ccs_split_type_low_high
@@ -28,8 +28,9 @@ program scalar_transport
   use mesh_utils, only: build_mesh, write_mesh
   use meshing, only: get_global_num_cells, get_centre, count_neighbours, &
                      create_cell_locator, create_face_locator, create_neighbour_locator, &
-                     get_local_index, get_boundary_status, get_face_normal, set_mesh_object, nullify_mesh_object
-  use vec, only: create_vector, set_vector_location
+                     get_local_index, get_boundary_status, get_face_normal, set_mesh_object, nullify_mesh_object, &
+                     get_local_num_cells
+  use vec, only: create_vector, set_vector_location, get_vector_data, restore_vector_data
   use scalars, only: update_scalars
   use utils, only: set_size, initialise, update, exit_print, add_field_to_outputlist, &
                    get_field, &
@@ -37,7 +38,7 @@ program scalar_transport
                    get_scheme_name
   use boundary_conditions, only: read_bc_config, allocate_bc_arrays
   use read_config, only: get_boundary_count, get_boundary_names, get_store_residuals, get_variables, get_variable_types
-  use io_visualisation, only: write_solution
+  use io_visualisation, only: write_solution, read_solution
   use timestepping, only: set_timestep, activate_timestepping, initialise_old_values, finalise_timestep
 
   implicit none
@@ -183,6 +184,13 @@ program scalar_transport
     nullify(phi)
   end do
 
+  if(restart) then
+    if (is_root(par_env)) then
+      print*, "restart capability activated"
+    end if
+    call read_solution(par_env, case_path, mesh, flow_fields)
+  end if 
+
   if (irank == par_env%root) then
     call print_configuration()
   end if
@@ -249,6 +257,8 @@ contains
     if (size(variable_types) /= size(variable_names)) then
        call error_abort("The number of variable types does not match the number of named variables")
     end if
+
+    call get_value(config_file, 'restart', restart)
     
     call get_value(config_file, 'steps', num_steps)
     if (num_steps == huge(0)) then

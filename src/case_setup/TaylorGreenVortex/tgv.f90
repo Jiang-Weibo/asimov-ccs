@@ -11,7 +11,7 @@ program tgv
                          velocity_relax, pressure_relax, res_target, case_name, &
                          write_gradients, velocity_solver_method_name, velocity_solver_precon_name, &
                          pressure_solver_method_name, pressure_solver_precon_name, &
-                         compute_bwidth, compute_partqual
+                         compute_bwidth, compute_partqual, restart
   use constants, only: cell, face, ccsconfig, ccs_string_len, geoext, adiosconfig, ndim, &
                        cell_centred_central, cell_centred_upwind, face_centred
   use constants, only: ccs_split_type_shared, ccs_split_type_low_high, ccs_split_undefined
@@ -20,7 +20,7 @@ program tgv
                     set_field_type, set_field_vector_properties, set_field_store_residuals, set_field_enable_cell_corrections
   use fortran_yaml_c_interface, only: parse
   use fv, only: update_gradient
-  use io_visualisation, only: write_solution
+  use io_visualisation, only: write_solution, read_solution
   use kinds, only: ccs_real, ccs_int, ccs_long
   use mesh_utils, only: read_mesh, build_mesh, write_mesh
   use parallel, only: initialise_parallel_environment, &
@@ -57,7 +57,7 @@ program tgv
   character(len = ccs_string_len), dimension(:), allocatable:: variable_names  ! variable names for BC reading
   integer(ccs_int), dimension(:), allocatable:: variable_types              ! cell centred upwind, central, etc.
 
-  type(vector_spec):: vec_properties
+  type(vector_spec) :: vec_properties
 
   type(field_spec):: field_properties
   class(field), pointer:: u, v, w, p, mf, viscosity, density
@@ -259,6 +259,13 @@ program tgv
   nullify(viscosity)
   nullify(density)
 
+  if(restart) then
+    if (is_root(par_env)) then
+      print*, "restart capability activated"
+    end if
+    call read_solution(par_env, case_path, mesh, flow_fields)
+  end if 
+
   call timer_stop(timer_index_init)
   call timer_register("I/O time for solution", timer_index_io_sol)
   call timer_register("Solver time inc I/O", timer_index_sol)
@@ -348,6 +355,8 @@ contains
     if (size(variable_types) /= size(variable_names)) then
        call error_abort("The number of variable types does not match the number of named variables")
     end if
+
+    call get_value(config_file, 'restart', restart)
 
     call get_value(config_file, 'steps', num_steps)
     if (num_steps == huge(0)) then

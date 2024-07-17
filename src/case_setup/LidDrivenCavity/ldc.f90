@@ -12,7 +12,7 @@ program ldc
   use case_config, only: num_iters, cps, domain_size, case_name, &
                          velocity_relax, pressure_relax, res_target, &
                          write_gradients, velocity_solver_method_name, velocity_solver_precon_name, &
-                         pressure_solver_method_name, pressure_solver_precon_name
+                         pressure_solver_method_name, pressure_solver_precon_name, restart
   use constants, only: cell, face, ccsconfig, ccs_string_len, &
                        cell_centred_central, cell_centred_upwind, face_centred, &
                        ccs_split_type_shared, ccs_split_type_low_high
@@ -26,10 +26,10 @@ program ldc
                       create_new_par_env, &
                       cleanup_parallel_environment, timer, &
                       read_command_line_arguments, sync, is_root
-  use meshing, only: set_mesh_object, nullify_mesh_object, get_local_num_cells
+  use meshing, only: set_mesh_object, nullify_mesh_object
   use parallel_types, only: parallel_environment
   use mesh_utils, only: build_mesh, write_mesh, build_square_mesh
-  use meshing, only: get_global_num_cells
+  use meshing, only: get_global_num_cells, get_local_num_cells
   use vec, only: create_vector, set_vector_location, get_vector_data, restore_vector_data
   use petsctypes, only: vector_petsc
   use pv_coupling, only: solve_nonlinear
@@ -38,7 +38,7 @@ program ldc
                    allocate_fluid_fields, dealloc_fluid_fields
   use boundary_conditions, only: read_bc_config, allocate_bc_arrays
   use read_config, only: get_variables, get_boundary_count, get_boundary_names, get_store_residuals, get_variable_types
-  use io_visualisation, only: write_solution
+  use io_visualisation, only: write_solution, read_solution
   use timers, only: timer_init, timer_register_start, timer_register, timer_start, timer_stop, timer_print, timer_print_all
 
   implicit none
@@ -204,6 +204,13 @@ program ldc
   nullify(viscosity)
   nullify(density)
 
+  if(restart) then
+    if (is_root(par_env)) then
+      print*, "restart capability activated"
+    end if
+    call read_solution(par_env, case_path, mesh, flow_fields)
+  end if 
+
   if (irank == par_env%root) then
     call print_configuration()
   end if
@@ -260,6 +267,8 @@ contains
     if (size(variable_types) /= size(variable_names)) then
        call error_abort("The number of variable types does not match the number of named variables")
     end if
+
+    call get_value(config_file, 'restart', restart)
 
     call get_value(config_file, 'iterations', num_iters)
     if (num_iters == huge(0)) then

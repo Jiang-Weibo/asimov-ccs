@@ -1,6 +1,9 @@
 ---
 title: ScalarTransport
 
+# restart capability
+restart: false  
+
 #  number of timesteps
 steps: 100
 #  number of iterations

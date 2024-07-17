@@ -9,7 +9,7 @@ module tgv2d_core
                          velocity_relax, pressure_relax, res_target, case_name, &
                          write_gradients, velocity_solver_method_name, velocity_solver_precon_name, &
                          pressure_solver_method_name, pressure_solver_precon_name, &
-                         compute_bwidth, compute_partqual
+                         compute_bwidth, compute_partqual, restart
   use constants, only: cell, face, ccsconfig, ccs_string_len, &
                        cell_centred_central, cell_centred_upwind, face_centred
   use kinds, only: ccs_real, ccs_int
@@ -22,7 +22,7 @@ module tgv2d_core
                       cleanup_parallel_environment, timer, &
                       read_command_line_arguments, sync, is_root
   use parallel_types, only: parallel_environment
-  use meshing, only: get_global_num_cells, set_mesh_object, nullify_mesh_object
+  use meshing, only: get_global_num_cells, set_mesh_object, nullify_mesh_object, get_local_num_cells
   use mesh_utils, only: build_square_mesh, write_mesh
   use vec, only: set_vector_location
   use petsctypes, only: vector_petsc
@@ -35,7 +35,7 @@ module tgv2d_core
   use read_config, only: get_variables, get_boundary_count, get_boundary_names, get_store_residuals, &
                          get_enable_cell_corrections, get_variable_types
   use timestepping, only: set_timestep, activate_timestepping, reset_timestepping
-  use io_visualisation, only: write_solution, reset_io_visualisation
+  use io_visualisation, only: write_solution, reset_io_visualisation, read_solution
   use fv, only: update_gradient
 
   implicit none
@@ -240,6 +240,13 @@ contains
     nullify(mf)
     nullify(viscosity)
     nullify(density)
+
+    if(restart) then
+      if (is_root(par_env)) then
+        print*, "restart capability activated"
+      end if
+      call read_solution(par_env, case_path, mesh, flow_fields)
+    end if 
     
     call timer(init_time)
 
@@ -263,6 +270,7 @@ contains
       if ((t == 1) .or. (t == num_steps) .or. (mod(t, write_frequency) == 0)) then
         call write_solution(par_env, case_path, mesh, flow_fields, t, num_steps, dt)
       end if
+
     end do
 
     ! Clean-up
@@ -305,6 +313,8 @@ contains
     if (size(variable_types) /= size(variable_names)) then
        call error_abort("The number of variable types does not match the number of named variables")
     end if
+
+    call get_value(config_file, 'restart', restart)
 
     call get_value(config_file, 'steps', num_steps)
     if (num_steps == huge(0)) then

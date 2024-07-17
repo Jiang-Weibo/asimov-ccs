@@ -9,7 +9,7 @@ module poiseuille_core
   use case_config, only: num_steps, num_iters, dt, cps, domain_size, write_frequency, &
                          velocity_relax, pressure_relax, res_target, case_name, &
                          write_gradients, velocity_solver_method_name, velocity_solver_precon_name, &
-                         pressure_solver_method_name, pressure_solver_precon_name
+                         pressure_solver_method_name, pressure_solver_precon_name, restart
   use constants, only: cell, face, ccsconfig, ccs_string_len, geoext, adiosconfig, ndim, &
                        cell_centred_central, cell_centred_upwind, face_centred
   use kinds, only: ccs_real, ccs_int, ccs_long
@@ -39,12 +39,11 @@ module poiseuille_core
   use meshing, only: get_total_num_cells, get_global_num_cells, set_mesh_object, nullify_mesh_object, get_local_num_cells
   use partitioning, only: compute_partitioner_input, &
                           partition_kway, compute_connectivity
-  use io_visualisation, only: write_solution, reset_io_visualisation
+  use io_visualisation, only: write_solution, reset_io_visualisation, read_solution
   use fv, only: update_gradient
   use utils, only: str
   use timers, only: timer_init, timer_register_start, timer_register, timer_start, timer_stop, &
                     timer_print, timer_get_time, timer_print_all, timer_reset
-  use vec, only: get_vector_data, restore_vector_data
 
   implicit none
 
@@ -246,6 +245,13 @@ module poiseuille_core
     call timer_stop(timer_index_init)
     call timer_register_start("Solver time inc I/O", timer_index_sol)
 
+    if(restart) then
+      if (is_root(par_env)) then
+        print*, "restart capability activated"
+      end if
+      call read_solution(par_env, case_path, mesh, flow_fields)
+    end if 
+
     call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
                           flow_fields)
 
@@ -309,6 +315,8 @@ module poiseuille_core
     if (size(variable_types) /= size(variable_names)) then
        call error_abort("The number of variable types does not match the number of named variables")
     end if
+
+    call get_value(config_file, 'restart', restart)
 
     call get_value(config_file, 'steps', num_steps)
     if (num_steps == huge(0)) then

@@ -1,6 +1,9 @@
 ---
 title: TaylorGreenVortex
 
+# restart capability
+restart: false  
+
 #  number of timesteps
 steps: 10
 #  number of iterations

@@ -9,7 +9,7 @@ program scalar_advection
   use case_config, only: num_steps, num_iters, dt, cps, domain_size, write_frequency, &
                          velocity_relax, pressure_relax, res_target, case_name, write_gradients, &
                          velocity_solver_method_name, velocity_solver_precon_name, &
-                         pressure_solver_method_name, pressure_solver_precon_name
+                         pressure_solver_method_name, pressure_solver_precon_name, restart
   use types, only: vector_spec, ccs_vector, matrix_spec, ccs_matrix, field_spec, &
                    equation_system, linear_solver, ccs_mesh, field_ptr, &
                    field, upwind_field, central_field, bc_config, face_locator, &
@@ -33,7 +33,7 @@ program scalar_advection
                       cleanup_parallel_environment, timer, &
                       read_command_line_arguments, is_root
   use fv, only: compute_fluxes, update_gradient
-  use io_visualisation, only: write_solution
+  use io_visualisation, only: write_solution, read_solution
   use read_config, only: get_variables, get_boundary_count, get_boundary_names, get_case_name, &
                          get_enable_cell_corrections, get_variable_types
   use boundary_conditions, only: read_bc_config, allocate_bc_arrays
@@ -225,6 +225,13 @@ program scalar_advection
 
   call finalise(M)
 
+  if(restart) then
+    if (is_root(par_env)) then
+      print*, "restart capability activated"
+    end if
+    call read_solution(par_env, case_path, mesh, flow_fields)
+  end if 
+
   ! Create linear solver & set options
   if (irank == par_env%root) print *, "Solve"
   call get_field(flow_fields, "scalar", scalar)
@@ -415,6 +422,8 @@ contains
     if (size(variable_types) /= size(variable_names)) then
        call error_abort("The number of variable types does not match the number of named variables")
     end if
+
+    call get_value(config_file, 'restart', restart)
 
     call get_value(config_file, 'steps', num_steps)
     if (num_steps == huge(0)) then

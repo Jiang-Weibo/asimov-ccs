@@ -9,11 +9,11 @@ program sandia
   use case_config, only: num_steps, num_iters, dt, domain_size, write_frequency, &
                          velocity_relax, pressure_relax, res_target, case_name, &
                          write_gradients, velocity_solver_method_name, velocity_solver_precon_name, &
-                         pressure_solver_method_name, pressure_solver_precon_name
+                         pressure_solver_method_name, pressure_solver_precon_name, restart
   use constants, only: cell, face, ccsconfig, ccs_string_len, geoext, adiosconfig, ndim, &
                        cell_centred_central, cell_centred_upwind, face_centred, &
                        ccs_split_type_shared, ccs_split_type_low_high, ccs_split_undefined
-  use meshing, only: set_mesh_object, nullify_mesh_object
+  use meshing, only: set_mesh_object, nullify_mesh_object, get_local_num_cells
   use kinds, only: ccs_real, ccs_int, ccs_long
   use types, only: field, field_spec, upwind_field, central_field, face_field, ccs_mesh, &
                    vector_spec, ccs_vector, io_environment, io_process, &
@@ -40,7 +40,7 @@ program sandia
   use mesh_utils, only: read_mesh, write_mesh
   use partitioning, only: compute_partitioner_input, &
                           partition_kway, compute_connectivity
-  use io_visualisation, only: write_solution
+  use io_visualisation, only: write_solution, read_solution
   use fv, only: update_gradient
   use utils, only: str
   use timers, only: timer_init, timer_register_start, timer_register, timer_start, timer_stop, &
@@ -251,6 +251,13 @@ program sandia
   call timer_register("I/O time for solution", timer_index_io_sol)
   call timer_register("Solver time inc I/O", timer_index_sol)
 
+  if(restart) then
+    if (is_root(par_env)) then
+      print*, "restart capability activated"
+    end if
+    call read_solution(par_env, case_path, mesh, flow_fields)
+  end if 
+
   do t = 1, num_steps
     call timer_start(timer_index_sol)
     call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
@@ -312,6 +319,7 @@ contains
        call error_abort("The number of variable types does not match the number of named variables")
     end if
 
+    call get_value(config_file, 'restart', restart)
 
     call get_value(config_file, 'steps', num_steps)
     if (num_steps == huge(0)) then
