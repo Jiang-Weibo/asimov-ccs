@@ -24,7 +24,7 @@ contains
 
   end subroutine
 
-  !> Read the field data to file
+  !> Read the field data from file
   module subroutine read_fields(par_env, case_name, mesh, flow, step, maxstep)
 
     use kinds, only: ccs_long
@@ -77,7 +77,6 @@ contains
     integer(ccs_int) :: index_global
 
     real(ccs_long), dimension(:), pointer :: output_data
-    integer(ccs_int) :: index_p, n_local, global_index_p, natural_index_p
     class(field), pointer :: phi
 
     sol_file = case_name // '.sol.h5'
@@ -85,8 +84,8 @@ contains
 
     call timer_register("Get natural data (output)", timer_index_nat_data_output)
     call timer_register("Get natural data (grads)", timer_index_nat_data)
-    call timer_register("Write output time", timer_index_output)
-    call timer_register("Write gradients time", timer_index_grad)
+    call timer_register("Read output time", timer_index_output)
+    call timer_register("Read gradients time", timer_index_grad)
 
     if (present(step)) then
       ! Unsteady case
@@ -128,14 +127,16 @@ contains
     call get_num_steps(sol_reader, steps)
     steps = steps - 1  ! Set to max. step (count starts from 0)
 
-     ! Loop over output list and write out
+    ! Loop over output list and write out
     call timer_start(timer_index_output)
     do i = 1, size(flow%fields)
       call get_field(flow, i, phi)
       if (phi%output) then
+        ! XXX: This seems unnecessary?
         call timer_start(timer_index_nat_data_output)
         call get_natural_data(par_env, mesh, phi%values, data)
         call timer_stop(timer_index_nat_data_output)
+
         data_name = "/" // trim(phi%name)
 
         call read_array(sol_reader, data_name, sel_start, sel_count, data, steps)
@@ -148,12 +149,13 @@ contains
         call get_vector_data(phi%values, output_data)
         output_data = re_order_data
 
-        call get_local_num_cells(n_local)
-        do index_p = 1, n_local
-          call create_cell_locator(index_p, loc_p) 
-          call get_global_index(loc_p, global_index_p)
-          call get_natural_index(loc_p, natural_index_p)
-        end do
+        ! XXX: This doesn't appear to do anything
+        ! call get_local_num_cells(n_local)
+        ! do index_p = 1, n_local
+        !   call create_cell_locator(index_p, loc_p) 
+        !   call get_global_index(loc_p, global_index_p)
+        !   call get_natural_index(loc_p, natural_index_p)
+        ! end do
 
         call restore_vector_data(phi%values, output_data)
         call update(phi%values)
@@ -163,8 +165,6 @@ contains
     end do
     
     call timer_stop(timer_index_output)
-
-    !call end_step(sol_reader)
 
     if (allocated(data)) then
       deallocate (data)
@@ -183,7 +183,7 @@ contains
       call cleanup_io(io_env)
     end if
   
-  end subroutine
+  end subroutine read_fields
 
 
   !> Write the field data to file
