@@ -173,7 +173,7 @@ contains
     type(adios2_variable) :: adios2_var
     integer(int64), dimension(:), allocatable :: tmp_var64
     integer(ccs_int) :: ierr
-    integer(int64) :: step_count = 1
+    integer(int64), parameter :: step_count = 1
 
     select type (io_proc)
     type is (adios2_io_process)
@@ -222,7 +222,7 @@ contains
     type(adios2_variable) :: adios2_var
     integer(int32), dimension(:), allocatable :: tmp_var32
     integer(ccs_int) :: ierr
-    integer(int64) :: step_count = 1
+    integer(int64), parameter :: step_count = 1
 
     select type (io_proc)
     type is (adios2_io_process)
@@ -270,7 +270,7 @@ contains
     type(adios2_variable) :: adios2_var
     integer(int64), dimension(:, :), allocatable :: tmp_var64
     integer(ccs_int) :: ierr
-    integer(int64) :: step_count = 1
+    integer(int64), parameter :: step_count = 1
 
     select type (io_proc)
     type is (adios2_io_process)
@@ -319,7 +319,7 @@ contains
     type(adios2_variable) :: adios2_var
     integer(int32), dimension(:, :), allocatable :: tmp_var32
     integer(ccs_int) :: ierr
-    integer(int64) :: step_count = 1
+    integer(int64), parameter :: step_count = 1
 
     select type (io_proc)
     type is (adios2_io_process)
@@ -367,7 +367,7 @@ contains
     type(adios2_variable) :: adios2_var
     real(real64), dimension(:), allocatable :: tmp_var64
     integer(ccs_int) :: ierr
-    integer(int64) :: step_count = 1
+    integer(int64), parameter :: step_count = 1
 
     select type (io_proc)
     type is (adios2_io_process)
@@ -416,7 +416,7 @@ contains
     type(adios2_variable) :: adios2_var
     real(real32), dimension(:), allocatable :: tmp_var32
     integer(ccs_int) :: ierr
-    integer(int64) :: step_count = 1
+    integer(int64), parameter :: step_count = 1
 
     select type (io_proc)
     type is (adios2_io_process)
@@ -464,7 +464,7 @@ contains
     type(adios2_variable) :: adios2_var
     real(real64), dimension(:, :), allocatable :: tmp_var64
     integer(ccs_int) :: ierr
-    integer(int64) :: step_count = 1
+    integer(int64), parameter :: step_count = 1
 
     select type (io_proc)
     type is (adios2_io_process)
@@ -513,7 +513,7 @@ contains
     type(adios2_variable) :: adios2_var
     real(real32), dimension(:, :), allocatable :: tmp_var32
     integer(ccs_int) :: ierr
-    integer(int64) :: step_count = 1
+    integer(int64), parameter :: step_count = 1
 
     select type (io_proc)
     type is (adios2_io_process)
