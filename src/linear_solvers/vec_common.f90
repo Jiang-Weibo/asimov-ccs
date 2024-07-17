@@ -76,7 +76,7 @@ contains
   end subroutine set_vector_values_entry
 
   !> Generic implementation to get vector data in natural ordering
-  module subroutine get_natural_data_vec(par_env, mesh, v, data) !global to natural
+  module subroutine get_natural_data_vec(par_env, mesh, v, data)
 
     class(parallel_environment), intent(in) :: par_env
     type(ccs_mesh), intent(in) :: mesh
@@ -107,13 +107,13 @@ contains
   end subroutine get_natural_data_vec
 
   !> Generic implementation to get vector data in global ordering
-  module subroutine get_global_data_vec(par_env, mesh, v, data) !natural to global
+  module subroutine get_global_data_vec(par_env, mesh, v, data)
 
     class(parallel_environment), intent(in) :: par_env
     type(ccs_mesh), intent(in) :: mesh
     class(ccs_vector), intent(inout) :: v
     real(ccs_real), dimension(:), allocatable, intent(out) :: data !< The returned vector data in
-                                                                   !< natural ordering. Note the use
+                                                                   !< global ordering. Note the use
                                                                    !< of allocatable + intent(out),
                                                                    !< this ensures it will be
                                                                    !< de/reallocated by this subroutine.
@@ -124,17 +124,17 @@ contains
     integer(ccs_int),dimension(:), pointer :: nat_glob_data 
 
     associate (topo => mesh%topo, &
-                local_num_cells => mesh%topo%local_num_cells)
+               local_num_cells => mesh%topo%local_num_cells)
       
       if (allocated(data)) then ! Shouldn't really happen...
         deallocate(data)
       end if
       allocate(data(local_num_cells))
       
-      global_num_cells = 0
+      ! Construct natural->global mapping
       call get_global_num_cells(global_num_cells)
-      
       allocate(nat_glob_data(global_num_cells))
+      nat_glob_data(:) = 0
 
       do i=1,local_num_cells
         call create_cell_locator(i, loc_p)
@@ -142,9 +142,6 @@ contains
         call get_global_index(loc_p, global_index_p)
         nat_glob_data(natural_index_p)=global_index_p
       end do
-      !----------need to add select for parallel environment and default case
-      ! DO mpi all reduce
-      !MPI_Allreduce(MPI_SUM)
       select type (par_env)
       type is (parallel_environment_mpi)
         call MPI_Allreduce(MPI_IN_PLACE, nat_glob_data, global_num_cells, MPI_integer, MPI_SUM, par_env%comm, ierr)
@@ -152,15 +149,13 @@ contains
         call error_abort("Unknown parallel environment")
       end select
 
+      ! Perform vector mapping
       call get_vector_data(v, vec_data)
       call reorder_data_vec(par_env, vec_data(1:local_num_cells), nat_glob_data(mesh%topo%natural_indices(1:local_num_cells)), &
                             data(1:local_num_cells))
-                            
       call restore_vector_data(v, vec_data)
 
     end associate
-    
-    
 
   end subroutine get_global_data_vec
 
