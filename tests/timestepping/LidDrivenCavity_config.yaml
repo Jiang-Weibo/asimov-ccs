@@ -7,7 +7,7 @@ restart: false
 unsteady: false
 
 #  number of steady iterations
-iterations: 100
+iterations: 10
 
 #  number of timesteps
 steps: 5
