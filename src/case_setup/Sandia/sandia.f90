@@ -9,7 +9,7 @@ program sandia
   use case_config, only: num_steps, num_iters, dt, domain_size, write_frequency, &
                          velocity_relax, pressure_relax, res_target, case_name, &
                          write_gradients, velocity_solver_method_name, velocity_solver_precon_name, &
-                         pressure_solver_method_name, pressure_solver_precon_name, restart
+                         pressure_solver_method_name, pressure_solver_precon_name, restart, unsteady
   use constants, only: cell, face, ccsconfig, ccs_string_len, geoext, adiosconfig, ndim, &
                        cell_centred_central, cell_centred_upwind, face_centred, &
                        ccs_split_type_shared, ccs_split_type_low_high, ccs_split_undefined
@@ -258,6 +258,13 @@ program sandia
     call read_solution(par_env, case_path, mesh, flow_fields)
   end if 
 
+  if(.not.unsteady) then
+    num_steps = 1
+    print*, "steady-state activated"
+  else
+    print*, "unsteady-state activated"
+  end if
+
   do t = 1, num_steps
     call timer_start(timer_index_sol)
     call solve_nonlinear(par_env, mesh, it_start, it_end, res_target, &
@@ -275,13 +282,17 @@ program sandia
     end if
 
     if ((t == 1) .or. (t == num_steps) .or. (mod(t, write_frequency) == 0)) then
-      call timer_start(timer_index_io_sol)
-      call write_solution(par_env, case_path, mesh, flow_fields, t, num_steps, dt)
-      call timer_stop(timer_index_io_sol)
+      if(.not. unsteady) then
+        call write_solution(par_env, case_path, mesh, flow_fields)
+      else
+        call timer_start(timer_index_io_sol)
+        call write_solution(par_env, case_path, mesh, flow_fields, t, num_steps, dt)
+        call timer_stop(timer_index_io_sol)
+      end if
     end if
     call timer_stop(timer_index_sol)
   end do
-
+ 
   ! Clean-up
 
   call timer_stop(timer_index_total)
@@ -321,24 +332,28 @@ contains
 
     call get_value(config_file, 'restart', restart)
 
-    call get_value(config_file, 'steps', num_steps)
-    if (num_steps == huge(0)) then
-      call error_abort("No value assigned to num_steps.")
-    end if
+    call get_value(config_file, 'unsteady', unsteady)
+
+    if(unsteady) then
+      call get_value(config_file, 'steps', num_steps)
+      if (num_steps == huge(0)) then
+        call error_abort("No value assigned to num_steps.")
+      end if
+
+      call get_value(config_file, 'dt', dt)
+      if (dt == huge(0.0)) then
+        call error_abort("No value assigned to dt.")
+      end if
+
+      call get_value(config_file, 'write_frequency', write_frequency)
+      if (write_frequency == huge(0.0)) then
+        call error_abort("No value assigned to write_frequency.")
+      end if
+    end if 
 
     call get_value(config_file, 'iterations', num_iters)
     if (num_iters == huge(0)) then
       call error_abort("No value assigned to num_iters.")
-    end if
-
-    call get_value(config_file, 'dt', dt)
-    if (dt == huge(0.0)) then
-      call error_abort("No value assigned to dt.")
-    end if
-
-    call get_value(config_file, 'write_frequency', write_frequency)
-    if (write_frequency == huge(0.0)) then
-      call error_abort("No value assigned to write_frequency.")
     end if
 
     call get_value(config_file, 'L', domain_size)
@@ -369,8 +384,12 @@ contains
     print *, " "
     print *, "******************************************************************************"
     print *, "* SIMULATION LENGTH"
-    print *, "* Running for ", num_steps, "timesteps and ", num_iters, "iterations"
-    write (*, '(1x, a, e10.3)') "* Time step size: ", dt
+    if (unsteady) then
+      print *, "* Running for ", num_steps, "timesteps and ", num_iters, "iterations"
+      write (*, '(1x, a, e10.3)') "* Time step size: ", dt
+    else
+      print *, "* Running for ", num_iters, "iterations"
+    end if 
     print *, "******************************************************************************"
     print *, "* MESH SIZE"
     print *, "* Global number of cells is ", mesh%topo%global_num_cells

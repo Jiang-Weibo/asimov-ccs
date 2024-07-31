@@ -142,6 +142,7 @@ contains
         call get_global_index(loc_p, global_index_p)
         nat_glob_data(natural_index_p)=global_index_p
       end do
+      
       select type (par_env)
       type is (parallel_environment_mpi)
         call MPI_Allreduce(MPI_IN_PLACE, nat_glob_data, global_num_cells, MPI_integer, MPI_SUM, par_env%comm, ierr)

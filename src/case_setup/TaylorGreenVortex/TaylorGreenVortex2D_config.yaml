@@ -4,10 +4,15 @@ title: TaylorGreenVortex2D
 # restart capability
 restart: false 
 
-#  number of timesteps
-steps: 5
+# unstaedy state
+unsteady: true
+
 #  number of iterations
 iterations: 5
+
+#  number of timesteps
+steps: 5
+
 # time step size
 dt: 0.01
 

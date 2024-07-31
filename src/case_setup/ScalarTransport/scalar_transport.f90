@@ -10,7 +10,7 @@ program scalar_transport
 
   use ccs_base, only: mesh
   use case_config, only: num_steps, num_iters, cps, domain_size, case_name, &
-                         res_target, write_gradients, dt, write_frequency, restart
+                         res_target, write_gradients, dt, write_frequency, restart, unsteady
   use constants, only: cell, face, ccsconfig, ccs_string_len, &
                        face_centred, cell_centred_central, cell_centred_upwind, &
                        ccs_split_type_low_high
@@ -199,20 +199,29 @@ program scalar_transport
   call set_timestep(dt)
 
   call timer(init_time)
+
+  if(.not.unsteady) then
+    num_steps = 1
+    print*, "steady-state activated"
+  else
+    print*, "unsteady-state activated"
+  end if
+
   ! Solve using SIMPLE algorithm
   if (irank == par_env%root) print *, "Start scalar solver"
-
-  ! ! Write out mesh and solution
-  call write_mesh(par_env, case_path, mesh)
-  call write_solution(par_env, case_path, mesh, flow_fields, 0, num_steps, dt)
   do t = 1, num_steps
+    call write_mesh(par_env, case_path, mesh)
     call update_scalars(par_env, mesh, flow_fields)
     if (par_env%proc_id == par_env%root) then
       print *, "TIME = ", t, " / ", num_steps
     end if
 
     if ((t == 1) .or. (t == num_steps) .or. (mod(t, write_frequency) == 0)) then
-      call write_solution(par_env, case_path, mesh, flow_fields, t, num_steps, dt)
+      if(.not. unsteady) then
+        call write_solution(par_env, case_path, mesh, flow_fields)
+      else
+        call write_solution(par_env, case_path, mesh, flow_fields, t, num_steps, dt)
+      end if 
     end if
 
     call finalise_timestep()
@@ -260,31 +269,35 @@ contains
 
     call get_value(config_file, 'restart', restart)
     
-    call get_value(config_file, 'steps', num_steps)
-    if (num_steps == huge(0)) then
-      call error_abort("No value assigned to num_steps.")
-    end if
+    call get_value(config_file, 'unsteady', unsteady)
 
-    call get_value(config_file, 'iterations', num_iters)
+    call get_value(config_file, 'iterations', num_iters) ! steady-state
     if (num_iters == huge(0)) then
       call error_abort("No value assigned to num_iters.")
     end if
 
-    call get_value(config_file, 'dt', dt)
-    if (dt == huge(0.0)) then
-      call error_abort("No value assigned to dt.")
-    end if
+    if(unsteady) then
+      call get_value(config_file, 'steps', num_steps)
+      if (num_steps == huge(0)) then
+        call error_abort("No value assigned to num_steps.")
+      end if
 
+      call get_value(config_file, 'dt', dt)
+      if (dt == huge(0.0)) then
+        call error_abort("No value assigned to dt.")
+      end if
+
+      call get_value(config_file, 'write_frequency', write_frequency)
+      if (write_frequency == huge(0.0)) then
+        call error_abort("No value assigned to write_frequency.")
+      end if
+    end if 
+    
     if (cps == huge(0)) then ! cps was not set on the command line
       call get_value(config_file, 'cps', cps)
       if (cps == huge(0)) then
         call error_abort("No value assigned to cps.")
       end if
-    end if
-
-    call get_value(config_file, 'write_frequency', write_frequency)
-    if (write_frequency == huge(0.0)) then
-      call error_abort("No value assigned to write_frequency.")
     end if
 
     call get_value(config_file, 'L', domain_size)
@@ -314,7 +327,12 @@ contains
     print *, " "
     print *, "******************************************************************************"
     print *, "* SIMULATION LENGTH"
-    print *, "* Running for ", num_iters, "iterations"
+    if (unsteady) then
+      print *, "* Running for ", num_steps, "timesteps and ", num_iters, "iterations"
+      write (*, '(1x, a, e10.3)') "* Time step size: ", dt
+    else
+      print *, "* Running for ", num_iters, "iterations"
+    end if 
     print *, "******************************************************************************"
     print *, "* MESH SIZE"
     print *, "* Cells per side: ", cps
