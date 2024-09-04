@@ -53,6 +53,9 @@ contains
     class(parallel_environment), allocatable, intent(in) :: par_env   !< parallel environment
     type(ccs_mesh), intent(in) :: mesh                                !< the mesh
     interface
+      !v Subroutine to evaluate source terms, case-specific.
+      !
+      !  Note this should return the integrated source.
       subroutine eval_sources(flow, phi, R, S)
         use types, only: fluid, field, ccs_vector
         type(fluid), intent(in) :: flow !< Provides access to full flow field
@@ -257,6 +260,9 @@ contains
     class(parallel_environment), allocatable, intent(in) :: par_env !< the parallel environment
     type(fluid), intent(inout) :: flow                   !< Container for flow fields
     interface
+      !v Subroutine to evaluate source terms, case-specific.
+      !
+      !  Note this should return the integrated source.
       subroutine eval_sources(flow, phi, R, S)
         use types, only: fluid, field, ccs_vector
         type(fluid), intent(in) :: flow !< Provides access to full flow field
@@ -371,6 +377,9 @@ contains
     type(fluid), intent(inout) :: flow                   !< Container for flow fields
     class(parallel_environment), allocatable, intent(in) :: par_env
     interface
+      !v Subroutine to evaluate source terms, case-specific.
+      !
+      !  Note this should return the integrated source.
       subroutine eval_sources(flow, phi, R, S)
         use types, only: fluid, field, ccs_vector
         type(fluid), intent(in) :: flow !< Provides access to full flow field
@@ -545,13 +554,17 @@ contains
 
   end subroutine calculate_momentum_pressure_source
 
+  !v Assembles the case-specific source terms into the momentum equation(s).
   subroutine get_momentum_sources(flow, u, eval_sources, R, S, M, rhs)
 
     use fv, only: add_fixed_source, add_linear_source
     
-    type(fluid), intent(in) :: flow
-    class(field), intent(in) :: u
+    type(fluid), intent(in) :: flow !< The flow field.
+    class(field), intent(in) :: u   !< The velocity field for this equation
     interface
+      !v Subroutine to evaluate source terms, case-specific.
+      !
+      !  Note this should return the integrated source.
       subroutine eval_sources(flow, phi, R, S)
         use types, only: fluid, field, ccs_vector
         type(fluid), intent(in) :: flow !< Provides access to full flow field
@@ -560,10 +573,10 @@ contains
         class(ccs_vector), intent(inout) :: S !< Work vector (for evaluating fixed/explicit sources)
       end subroutine eval_sources
     end interface
-    class(ccs_vector), intent(inout) :: R
-    class(ccs_vector), intent(inout) :: S
-    class(ccs_matrix), intent(inout) :: M       !< System matrix
-    class(ccs_vector), intent(inout) :: rhs     !< RHS vector
+    class(ccs_vector), intent(inout) :: R   !< Linear source vector
+    class(ccs_vector), intent(inout) :: S   !< Fixed source vector
+    class(ccs_matrix), intent(inout) :: M   !< System matrix
+    class(ccs_vector), intent(inout) :: rhs !< RHS vector
 
     call eval_sources(flow, u, R, S)
     ! TODO: Insert model-specific sources here

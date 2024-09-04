@@ -21,6 +21,9 @@ module pv_coupling
       class(parallel_environment), allocatable, intent(in) :: par_env
       type(ccs_mesh), intent(in) :: mesh
       interface
+        !v Subroutine to evaluate source terms, case-specific.
+        !
+        !  Note this should return the integrated source.
         subroutine eval_sources(flow, phi, R, S)
           use types, only: fluid, field, ccs_vector
           type(fluid), intent(in) :: flow !< Provides access to full flow field

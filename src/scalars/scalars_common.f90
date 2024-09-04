@@ -39,6 +39,9 @@ contains
     class(parallel_environment), allocatable, intent(in) :: par_env !< parallel environment
     type(ccs_mesh), intent(in) :: mesh                              !< the mesh
     interface
+      !v Subroutine to evaluate source terms, case-specific.
+      !
+      !  Note this should return the integrated source.
       subroutine eval_sources(flow, phi, R, S)
         use types, only: fluid, field, ccs_vector
         type(fluid), intent(in) :: flow !< Provides access to full flow field
@@ -125,6 +128,9 @@ contains
     class(parallel_environment), allocatable, intent(in) :: par_env !< parallel environment
     type(fluid), intent(inout) :: flow                              !< The structure containting all the fluid fields
     interface
+      !v Subroutine to evaluate source terms, case-specific.
+      !
+      !  Note this should return the integrated source.
       subroutine eval_sources(flow, phi, R, S)
         use types, only: fluid, field, ccs_vector
         type(fluid), intent(in) :: flow !< Provides access to full flow field
@@ -213,6 +219,9 @@ contains
     type(fluid), intent(in) :: flow !< Provides access to full flow field
     class(field), intent(in) :: phi !< The transported field
     interface
+      !v Subroutine to evaluate source terms, case-specific.
+      !
+      !  Note this should return the integrated source.
       subroutine eval_sources(flow, phi, R, S)
         use types, only: fluid, field, ccs_vector
         type(fluid), intent(in) :: flow !< Provides access to full flow field
