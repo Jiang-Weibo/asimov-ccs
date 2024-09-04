@@ -2665,6 +2665,9 @@ contains
           ! v_p_nb.V2 / |v_p_nb|**2
           v_p_nb = x_nb - x_p
           interpol_factor = dot_product(v_p_nb, x_f - x_p) / dot_product(v_p_nb, v_p_nb)
+          if (interpol_factor > 1) then
+            call dprint("invalid interpol factor " // str(interpol_factor))
+          end if
 
           ! inverse interpol factor as it is relative to x_p
           ! the closer x_f is to x_p, the higher the interpol_factor
@@ -2764,66 +2767,70 @@ contains
     print *, par_env%proc_id, "scalefactor        : ", mesh%geo%scalefactor
     print *, ""
 
-    if (associated(mesh%geo%volumes)) then
-      print *, par_env%proc_id, "volumes     : ", mesh%geo%volumes(1:nb_elem)
-    else
-      print *, par_env%proc_id, "volumes     : UNALLOCATED"
-    end if
+    associate (local_offset => mesh%topo%shared_array_local_offset, &
+               total_offset => mesh%topo%shared_array_total_offset)
 
-    if (allocated(mesh%geo%face_interpol)) then
-      print *, par_env%proc_id, "face_interpol          : ", mesh%geo%face_interpol(1:nb_elem)
-    else
-      print *, par_env%proc_id, "face_interpol          : UNALLOCATED"
-    end if
+      if (associated(mesh%geo%volumes)) then
+        print *, par_env%proc_id, "volumes     : ", mesh%geo%volumes(1 + total_offset:nb_elem + total_offset)
+      else
+        print *, par_env%proc_id, "volumes     : UNALLOCATED"
+      end if
 
-    print *, ""
-    if (associated(mesh%geo%face_areas)) then
-      do i = 1, nb_elem
-        print *, par_env%proc_id, "face_areas(1:" // str(nb_elem / 2) // ", " // str(i) // ")", &
-          mesh%geo%face_areas(1:nb_elem / 2, i)
-      end do
-    else
-      print *, par_env%proc_id, "face_areas             : UNALLOCATED"
-    end if
+      if (allocated(mesh%geo%face_interpol)) then
+        print *, par_env%proc_id, "face_interpol          : ", mesh%geo%face_interpol(1:nb_elem)
+      else
+        print *, par_env%proc_id, "face_interpol          : UNALLOCATED"
+      end if
 
-    print *, ""
-    if (associated(mesh%geo%x_p)) then
-      do i = 1, nb_elem
-        print *, par_env%proc_id, "x_p(:)", mesh%geo%x_p(:, i)
-      end do
-    else
-      print *, par_env%proc_id, "x_p                    : UNALLOCATED"
-    end if
+      print *, ""
+      if (associated(mesh%geo%face_areas)) then
+        do i = 1, nb_elem
+          print *, par_env%proc_id, "face_areas(1:" // str(nb_elem / 2) // ", " // str(i) // ")", &
+            mesh%geo%face_areas(1:nb_elem / 2, i + local_offset)
+        end do
+      else
+        print *, par_env%proc_id, "face_areas             : UNALLOCATED"
+      end if
 
-    print *, ""
-    if (associated(mesh%geo%x_f)) then
-      do i = 1, nb_elem
-        print *, par_env%proc_id, "x_f(2, 1:" // str(nb_elem / 2) // ", " // str(i) // ")", &
-          mesh%geo%x_f(2, 1:nb_elem / 2, i)
-      end do
-    else
-      print *, par_env%proc_id, "x_f                    : UNALLOCATED"
-    end if
+      print *, ""
+      if (associated(mesh%geo%x_p)) then
+        do i = 1, nb_elem
+          print *, par_env%proc_id, "x_p(:)", mesh%geo%x_p(:, i + total_offset)
+        end do
+      else
+        print *, par_env%proc_id, "x_p                    : UNALLOCATED"
+      end if
 
-    print *, ""
-    if (associated(mesh%geo%face_normals)) then
-      do i = 1, nb_elem
-        print *, par_env%proc_id, "face_normals(2, 1:" // str(nb_elem / 2) // ", " // str(i) // ")", &
-          mesh%geo%face_normals(2, 1:nb_elem / 2, i)
-      end do
-    else
-      print *, par_env%proc_id, "face_normals          : UNALLOCATED"
-    end if
+      print *, ""
+      if (associated(mesh%geo%x_f)) then
+        do i = 1, nb_elem
+          print *, par_env%proc_id, "x_f(2, 1:" // str(nb_elem / 2) // ", " // str(i) // ")", &
+            mesh%geo%x_f(2, 1:nb_elem / 2, i + local_offset)
+        end do
+      else
+        print *, par_env%proc_id, "x_f                    : UNALLOCATED"
+      end if
 
-    print *, ""
-    if (associated(mesh%geo%vert_coords)) then
-      do i = 1, nb_elem
-        print *, par_env%proc_id, "vert_coords(2, 1:" // str(nb_elem / 2) // ", " // str(i) // ")", &
-          mesh%geo%vert_coords(2, 1:nb_elem / 2, i)
-      end do
-    else
-      print *, par_env%proc_id, "vert_coords           : UNALLOCATED"
-    end if
+      print *, ""
+      if (associated(mesh%geo%face_normals)) then
+        do i = 1, nb_elem
+          print *, par_env%proc_id, "face_normals(2, 1:" // str(nb_elem / 2) // ", " // str(i) // ")", &
+            mesh%geo%face_normals(2, 1:nb_elem / 2, i + local_offset)
+        end do
+      else
+        print *, par_env%proc_id, "face_normals          : UNALLOCATED"
+      end if
+
+      print *, ""
+      if (associated(mesh%geo%vert_coords)) then
+        do i = 1, nb_elem
+          print *, par_env%proc_id, "vert_coords(2, 1:" // str(nb_elem / 2) // ", " // str(i) // ")", &
+            mesh%geo%vert_coords(2, 1:nb_elem / 2, i + local_offset)
+        end do
+      else
+        print *, par_env%proc_id, "vert_coords           : UNALLOCATED"
+      end if
+    end associate
 
     print *, par_env%proc_id, "############################# End Print Geometry ########################################"
 
