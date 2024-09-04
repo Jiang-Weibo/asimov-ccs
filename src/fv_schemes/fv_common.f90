@@ -859,6 +859,41 @@ contains
 
   end subroutine update_gradient_component
 
+  !v Zeros the linear and fixed sources. Can be used in place of a specific implementation when
+  !  there are no sources, serves as a template for any case-specific source implementation.
+  module subroutine zero_sources(flow, phi, R, S)
+
+    type(fluid), intent(in) :: flow !< Provides access to full flow field
+    class(field), intent(in) :: phi !< Field being transported
+    class(ccs_vector), intent(inout) :: R !< Work vector (for evaluating linear/implicit sources)
+    class(ccs_vector), intent(inout) :: S !< Work vector (for evaluating fixed/explicit sources)
+
+    real(ccs_real), dimension(:), pointer:: R_data, S_data
+    integer(ccs_int) :: local_num_cells
+
+    integer :: i
+
+    ! Silence warnings
+    associate(foo => flow, bar => phi)
+    end associate
+
+    call get_vector_data(R, R_data)
+    call get_vector_data(S, S_data)
+
+    call get_local_num_cells(local_num_cells)
+    do i = 1, local_num_cells
+      ! XXX: Dummy implementation, use flow/phi to compute field-specific sources
+      R_data(i) = 0
+      S_data(i) = 0
+    end do
+
+    call restore_vector_data(R, R_data)
+    call restore_vector_data(S, S_data)
+    call update(R)
+    call update(S)
+
+  end subroutine zero_sources
+  
   !> Adds a fixed source term to the righthand side of the equation
   module subroutine add_fixed_source(S, rhs)
 
