@@ -7,9 +7,9 @@ are of the general form
 \begin{equation}
 	\frac{\partial\phi}{\partial{}t} + \nabla\cdot\phi{}u = \nabla\cdot\Gamma\nabla\phi + S
 \end{equation}
-where $$\phi$$ is the transported variable, u the velocity vector, \Gamma the diffusion coefficient
+where \(\phi\) is the transported variable, u the velocity vector, \Gamma the diffusion coefficient
 and S is a source term.
-Frequently source terms have linear and fixed components: $$S=S^{\phi}-R\phi$$ so that the equation
+Frequently source terms have linear and fixed components: \(S=S^{\phi}-R\phi{}\) so that the equation
 is written as
 \begin{equation}
 	\frac{\partial\phi}{\partial{}t} + \nabla\cdot\phi{}u + R\phi = \nabla\cdot\Gamma\nabla\phi + S^{\phi}
@@ -25,10 +25,10 @@ which yields the linear system
 \begin{equation}
 	(A + RV)\phi = (b + SV)
 \end{equation}
-where the formation of $$A$$ and $$b$ have been discussed elsewhere.
-The additional terms $$RV$$ and $$SV$$ are diagonal matrices representing the *integrated* source
+where the formation of \(A\) and \(b\) have been discussed elsewhere.
+The additional terms \(RV\) and \(SV\) are diagonal matrices representing the *integrated* source
 terms, this is reflects the code structure which accepts the integrated sources, *i.e.* user and
-model code evaluating source terms are expected to provide $$RV$$ and $$SV$$.
+model code evaluating source terms are expected to provide \(RV\) and \(SV\).
 This is demonstrated in the body of `zero_sources`:
 ```
 do index_p = 1, local_num_cells
